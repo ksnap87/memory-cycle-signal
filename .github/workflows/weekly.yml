@@ -25,13 +25,6 @@ jobs:
       - name: 패키지 설치
         run: pip install -r requirements-ci.txt
 
-      - name: 한글 폰트 설치 (리포트 차트 한글 깨짐 방지)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y fonts-nanum
-          fc-cache -f
-          rm -rf ~/.cache/matplotlib   # matplotlib 가 새 폰트를 다시 스캔하도록 캐시 비움
-
       - name: 데이터 갱신 + 신호 계산 + 리포트 생성
         env:
           CUSTOMS_API_KEY: ${{ secrets.CUSTOMS_API_KEY }}   # 없으면 fetch_current 가 수출 갱신을 건너뜀(비치명적)

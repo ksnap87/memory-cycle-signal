@@ -13,8 +13,104 @@ import pandas as pd
 import yaml
 
 from analyze import load, build_signals, quintile_backtest, TARGETS, HERE
-from make_report import (chart_cycle, chart_quintile_grid, chart_recent_exports,
-                         chart_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
+from chart_data import (data_cycle, data_quintile_grid, data_recent_exports,
+                        data_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
+
+SRC = os.path.dirname(os.path.abspath(__file__))
+
+
+def _read_chartjs() -> str:
+    """동봉한 Chart.js 를 통째로 HTML 에 인라인 — 외부 CDN 의존 0,
+    비번(StatiCrypt) 페이지·오프라인에서도 그래프가 확실히 그려지게."""
+    with open(os.path.join(SRC, "vendor", "chart.umd.min.js"), encoding="utf-8") as f:
+        return f.read().replace("</script", "<\\/script")
+
+
+# 브라우저에서 실행될 차트 초기화 코드(반응형). window.__CHARTDATA__ 의 숫자로 그림.
+# f-string 아님 — JS 의 중괄호를 그대로 둠.
+INIT_JS = r"""
+(function(){
+  if(typeof Chart==='undefined' || !window.__CHARTDATA__) return;
+  var D = window.__CHARTDATA__;
+  Chart.defaults.font.family = "-apple-system,'Apple SD Gothic Neo','Segoe UI',sans-serif";
+  Chart.defaults.color = "#3a3a3c";
+  Chart.defaults.animation = false;
+
+  function baseOpts(o){
+    o = o || {};
+    return {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{position:'top', labels:{boxWidth:12, font:{size:12}, padding:10}},
+        title: o.title ? {display:true, text:o.title, font:{size:13, weight:'bold'}, color:'#1d1d1f', padding:{bottom:6}} : {display:false},
+        tooltip:{backgroundColor:'rgba(0,0,0,.82)', padding:9, titleFont:{size:12}, bodyFont:{size:12}}
+      },
+      scales:{
+        x:{ticks:{maxTicksLimit:o.xmax||8, autoSkip:true, maxRotation:0, font:{size:10}, color:'#8e8e93'}, grid:{display:false}},
+        y:{ticks:{font:{size:10}, color:'#8e8e93'}, grid:{color:'#eef0f2'},
+           title: o.ytitle ? {display:true, text:o.ytitle, font:{size:10}, color:'#8e8e93'} : {display:false}}
+      }
+    };
+  }
+  function line(d, color, w){
+    return {label:d.label, data:d.data, borderColor:color||d.color, backgroundColor:color||d.color,
+            borderWidth:w||2, pointRadius:0, pointHoverRadius:4, tension:.15, spanGaps:true};
+  }
+
+  // 2-a) 수출 금액 20년 (가로 스크롤)
+  var ex = D.exports, elE = document.getElementById('cExports');
+  if(ex && elE){
+    new Chart(elE, {type:'line',
+      data:{labels:ex.labels, datasets: ex.series.map(function(s){return line(s);})},
+      options: baseOpts({ytitle:'월 수출액 (억$)', xmax:16})});
+  }
+  // 2-b) 메모리 수출 분해 (시작=100)
+  var dc = D.decomp, elD = document.getElementById('cDecomp');
+  if(dc && elD){
+    new Chart(elD, {type:'line',
+      data:{labels:dc.labels, datasets:[
+        {label:'수출액(금액)', data:dc.amount, borderColor:'#ff3b30', backgroundColor:'#ff3b30', borderWidth:2.6, pointRadius:0, pointHoverRadius:4, tension:.15},
+        {label:'평균단가($/kg)', data:dc.price, borderColor:'#af52de', backgroundColor:'#af52de', borderWidth:2.6, pointRadius:0, pointHoverRadius:4, tension:.15},
+        {label:'물량(톤)', data:dc.volume, borderColor:'#34c759', backgroundColor:'#34c759', borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:.15},
+        {label:'기준 100', data:dc.labels.map(function(){return 100;}), borderColor:'#c7c7cc', borderWidth:1, borderDash:[5,4], pointRadius:0}
+      ]},
+      options: baseOpts({ytitle:(dc.base+' = 100'), xmax:8})});
+  }
+  // 3) 분위 막대 (지표별)
+  (D.quint||[]).forEach(function(q, i){
+    var el = document.getElementById('cQ'+i); if(!el) return;
+    var binc = q.bincolors;
+    var opt = baseOpts({title:q.title});
+    opt.scales = {
+      x:{ticks:{font:{size:9}, color:function(c){return binc[c.index]||'#8e8e93';}}, grid:{display:false}},
+      y:{ticks:{font:{size:9}, color:'#8e8e93'}, grid:{color:'#eef0f2'}, title:{display:true, text:'1년 뒤 수익률(%)', font:{size:9}, color:'#8e8e93'}}
+    };
+    new Chart(el, {type:'bar',
+      data:{labels:q.binlabels.map(function(b,k){return [b, q.ranges[k]];}), datasets:[
+        {label:'삼성전자', data:q.samsung, backgroundColor:'#0071e3', borderRadius:3, maxBarThickness:36},
+        {label:'SK하이닉스', data:q.hynix, backgroundColor:'#ff9500', borderRadius:3, maxBarThickness:36}
+      ]},
+      options: opt});
+  });
+  // 4) 사이클 — 주가(로그) + 수출 증가율
+  var cy = D.cycle;
+  if(cy && document.getElementById('cPrice')){
+    var po = baseOpts({title:'삼성·SK하이닉스 주가 (시작=100, 로그축)', xmax:8});
+    po.scales.y = {type:'logarithmic', ticks:{font:{size:9}, color:'#8e8e93'}, grid:{color:'#eef0f2'}};
+    new Chart(document.getElementById('cPrice'), {type:'line',
+      data:{labels:cy.labels, datasets: cy.prices.map(function(s){return line(s, s.color, 1.8);})},
+      options: po});
+  }
+  if(cy && document.getElementById('cYoY')){
+    var ds = cy.yoy.map(function(s){return line(s, s.color, 1.8);});
+    ds.push({label:'0%', data:cy.labels.map(function(){return 0;}), borderColor:'#c7c7cc', borderWidth:1, borderDash:[5,4], pointRadius:0});
+    new Chart(document.getElementById('cYoY'), {type:'line',
+      data:{labels:cy.labels, datasets: ds},
+      options: baseOpts({title:'반도체·메모리 수출 증가율 (작년比 %)', ytitle:'%', xmax:8})});
+  }
+})();
+"""
 
 # 신뢰도/설명은 판단이 들어가므로 라벨별로 명시
 META = {
@@ -138,10 +234,17 @@ def main() -> None:
     sig_cfg = cfg.get("signals", {})
     live_cur = load_live_current()   # 최신 현재값(있으면 우선) ← 매주 자동 갱신 핵심
 
-    cycle_png = chart_cycle(df)
-    quint_png = chart_quintile_grid(df)          # 4개 지표 × 삼성·하이닉스 = 8개 계열
-    recent_png = chart_recent_exports(df)        # 최근 24개월 실제 수출 금액
-    decomp_png = chart_export_decomp(df)         # 메모리 수출 금액 vs 물량 vs 단가
+    # 그림(PNG) 대신 '숫자'만 뽑는다 → 브라우저의 Chart.js 가 반응형 그래프로 직접 그림
+    chart_payload = {
+        "cycle": data_cycle(df),                 # 섹션4: 주가 + 수출 증가율 (20년)
+        "quint": data_quintile_grid(df),         # 섹션3: 4개 지표 × 삼성·하이닉스 막대
+        "exports": data_recent_exports(df),      # 섹션2: 20년 전체 수출 금액(가로 스크롤)
+        "decomp": data_export_decomp(df),        # 섹션2: 메모리 수출 금액 vs 물량 vs 단가
+    }
+    n_q = len(chart_payload["quint"])
+    ex_span = chart_payload["exports"].get("span", "")
+    q_canvases = "".join(f'<div class="chartbox"><canvas id="cQ{i}"></canvas></div>'
+                         for i in range(n_q))
     q15 = both_q15(df)
 
     # 3번 섹션 그림 x축과 '똑같은' 칸 경계(작년比 %) — 설명 문장에 그대로 주입(숫자 어긋남 방지)
@@ -300,6 +403,16 @@ def main() -> None:
       .muted{color:#8e8e93;font-size:.82rem}
       img{max-width:100%;border-radius:10px;border:1px solid #e5e5ea;margin:.4em 0}
       .big{font-size:1.1rem}
+      /* 인터랙티브 차트(반응형) — 화면 폭에 맞게 또렷하게, 손가락으로 값 확인 */
+      .charthint{color:#8e8e93;font-size:.82rem;margin:.4em 0 .1em}
+      .chartbox{position:relative;height:330px;margin:.6em 0;border:1px solid #e5e5ea;
+                border-radius:12px;background:#fff;padding:10px 8px 6px}
+      .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #e5e5ea;
+               border-radius:12px;margin:.4em 0}
+      .scrollx .chartbox{border:none;min-width:1180px;height:350px;margin:0}
+      .qgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.6em 0}
+      .qgrid .chartbox{height:300px;margin:0}
+      @media(max-width:680px){.qgrid{grid-template-columns:1fr}.chartbox{height:300px}}
     </style>"""
 
     body = f"""
@@ -337,7 +450,8 @@ def main() -> None:
       <span class="muted">¹ 원달러는 '높을수록 수출 유리'라 방향이 반대 — 바닥이 좋은 게 아니어서 같은 칸으로 비교 못 합니다.</span></div>
 
     <h2>2. 지금 수출이 실제로 어떻게 가고 있나</h2>
-    <img src="data:image/png;base64,{recent_png}">
+    <p class="charthint">← 좌우로 밀어서 20년 전체({ex_span})를 볼 수 있어요 · 점을 누르면 그달 값 표시 →</p>
+    <div class="scrollx"><div class="chartbox"><canvas id="cExports"></canvas></div></div>
     <p class="big">가장 최근 <b>{semi['month']}</b> 기준 — 반도체 수출 <b>{semi['eok']:.0f}억 달러</b>{'(사상 최고치)' if semi['is_high'] else ''},
     작년 같은 달보다 <b>+{semi['yoy']:.0f}%</b>. 메모리 수출 <b>{mem['eok']:.0f}억 달러</b>{'(사상 최고치)' if mem['is_high'] else ''},
     작년比 <b>+{mem['yoy']:.0f}%</b>. 다만 <b>최근 1~2달은 더 안 오르고 옆걸음(횡보)</b> 중입니다
@@ -346,7 +460,7 @@ def main() -> None:
     <div class="step"><b>"수출이 늘었다" — 물량이 늘었나, 비싸게 판 건가?</b><br>
       수출 금액은 <b>물량(몇 톤 팔았나) × 단가(kg당 얼마)</b>로 쪼갤 수 있습니다.
       그래야 "진짜 많이 판 건지, 비싸서 금액만 커 보이는 건지"가 드러납니다.</div>
-    <img src="data:image/png;base64,{decomp_png}">
+    <div class="chartbox"><canvas id="cDecomp"></canvas></div>
     <p class="big"><b>지금의 수출 급증은 거의 다 '가격(단가)' 때문입니다 — 물량이 아니라.</b><br>
     메모리 금액 <b>+{mem['yoy']:.0f}%</b> = 물량 <b>+{mem['vol_yoy']:.0f}%</b> × 단가 <b>+{mem['price_yoy']:.0f}%</b>.
     특히 <b>D램</b>은 물량은 거의 그대로(+{dram['vol_yoy']:.0f}%)인데 <b>단가가 +{dram['price_yoy']:.0f}%</b> 뛰어 금액이 +{dram['yoy']:.0f}%가 됐습니다.
@@ -375,13 +489,15 @@ def main() -> None:
       그림 4개는 가장 믿을만한 지표 4개(반도체수출·메모리수출·SOX·마이크론),
       각 그림 <b>x축의 1번~5번</b>이 그 지표의 작년比 구간 — <b>1번=가장 쌀 때 … 5번=가장 비쌀 때</b>입니다
       (초록 1·2번 / 회색 3번 / 빨강 4·5번 — <b>맨 아래 표와 똑같은 번호·색</b>).</div>
-    <img src="data:image/png;base64,{quint_png}">
+    <p class="charthint">막대를 누르면 정확한 수익률이 표시됩니다 · 파랑 삼성전자 / 주황 SK하이닉스</p>
+    <div class="qgrid">{q_canvases}</div>
     <p class="big"><b>읽는 법:</b> 네 지표 모두 <b>1번(쌀 때)에서 사면 1년 뒤 수익이 크고, 5번 쪽(비쌀 때)으로 갈수록 막대가 낮아집니다</b>
     — 비쌀 때(4·5번) 산 칸은 수익이 0 근처거나 손해. = <b>쌀 때(1번) 사고 비쌀 때(5번) 팔라</b>를 20년 데이터가 한목소리로 보여줍니다.
     그리고 <b>지금은 네 지표 모두 5번 칸(과열)</b>입니다 — 바로 아래 표가 그 5번을 올해 월별로 보여줍니다.</p>
     {traj_table_html}
     <h2>4. 20년 그림으로 보기</h2>
-    <img src="data:image/png;base64,{cycle_png}">
+    <div class="chartbox"><canvas id="cPrice"></canvas></div>
+    <div class="chartbox"><canvas id="cYoY"></canvas></div>
     <p class="big">아래 칸(수출 증가율)이 <b>바닥을 칠 때마다</b> 위 칸(주가)도 바닥이었고, <b>치솟을 때</b> 주가도 천장이었습니다.
     그리고 <b>맨 오른쪽 = 지금</b> — 수출 증가율이 20년 중 가장 높이 치솟아 있습니다(과열).</p>
 
@@ -394,9 +510,14 @@ def main() -> None:
     </div>
     <p class="muted">자료: 주가·SOX·마이크론·환율 = yfinance / 반도체·메모리 수출 = 관세청 수출입실적. 어려운 통계표(상관계수·선행성)는 전문가용이라 v1 리포트에 따로 있습니다.</p>
     """
+    # Chart.js 라이브러리(인라인) + 데이터(JSON) + 초기화 스크립트를 body 끝에 주입
+    chart_json = json.dumps(chart_payload, ensure_ascii=False)
+    scripts = ("<script>" + _read_chartjs() + "</script>\n"
+               "<script>window.__CHARTDATA__=" + chart_json + ";\n" + INIT_JS + "</script>")
+
     out = f"<!doctype html><html lang='ko'><head><meta charset='utf-8'>" \
           f"<meta name='viewport' content='width=device-width,initial-scale=1'>" \
-          f"<title>반도체 사이클 쉬운 리포트 v3</title>{style}</head><body>{body}</body></html>"
+          f"<title>반도체 사이클 쉬운 리포트 v3</title>{style}</head><body>{body}{scripts}</body></html>"
     out_path = os.path.join(REPORTS, "백테스트_리포트_v3.html")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(out)
