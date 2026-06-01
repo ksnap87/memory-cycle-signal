@@ -1,18 +1,20 @@
 """
-Phase A 산출 ②-쉬운판 — reports/백테스트_리포트_v2.html 생성.
+Phase A 산출 ②-쉬운판 — reports/백테스트_리포트_v3.html 생성.
 
 v1이 전문용어(상관계수·IC·선행성)를 앞세워 비전문가가 읽기 어려웠음.
 v2 = 용어 제거, "어떤 지표가 / 지금 어떤지 / 왜 그렇게 보는지"만 그림과 평이한 말로.
+v3 = 3번 섹션에 '지금 어느 칸(분위)인지 + 올해(2026) 월별 칸 이동' 표 추가.
 차트는 v1과 동일(사이클 동행 + 분위별 수익)을 재사용.
 """
 import os
+import json
 import datetime as dt
 import pandas as pd
 import yaml
 
 from analyze import load, build_signals, quintile_backtest, TARGETS, HERE
 from make_report import (chart_cycle, chart_quintile_grid, chart_recent_exports,
-                         chart_export_decomp, windowed, REPORTS, CALIB_SINCE)
+                         chart_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
 
 # 신뢰도/설명은 판단이 들어가므로 라벨별로 명시
 META = {
@@ -37,12 +39,12 @@ def sig_pill(zone: str) -> str:
 
 
 def q_dots(q: int, zone: str) -> str:
-    """20년 분포상 현재 위치 — 5점 중 현재 Q만 색칠(왼쪽=바닥, 오른쪽=천장)."""
+    """20년 분포상 현재 위치 — 5칸 중 현재 칸만 색칠(왼쪽=1번 바닥, 오른쪽=5번 천장)."""
     c = {"매수권": "#34c759", "매도권": "#ff3b30", "중립": "#8e8e93"}.get(zone, "#8e8e93")
     dots = "".join(
         f'<span class="dot" style="background:{c if i == q else "#d2d2d7"}"></span>'
         for i in range(1, 6))
-    return f'<span class="qdots">{dots}</span><b>Q{q}</b>'
+    return f'<span class="qdots">{dots}</span><b>{q}번</b>'
 
 
 def yoy_cell(yv: float) -> str:
@@ -72,17 +74,80 @@ def both_q15(df: pd.DataFrame) -> dict:
     return out
 
 
+def _bin_color(q: int) -> str:
+    """분위 칸 색 — 낮을수록(쌀 때) 초록, 높을수록(비쌀 때) 빨강. (low_is_buy 지표 기준)"""
+    if q <= 2:
+        return "#34c759"
+    if q >= 4:
+        return "#ff3b30"
+    return "#8e8e93"
+
+
+def yearly_quintile_path(df: pd.DataFrame, year: int) -> dict:
+    """각 지표의 해당 연도 '월별 분위(Q1~Q5)'. 기준 분포 = 보정창(2013년~).
+    퍼센타일→Q 환산은 섹션1 '지금 위치'와 동일(q_from_pct) → 표끼리 어긋나지 않음.
+    반환: {label: {월(int): (q, yoy값)}}"""
+    sigs = build_signals(df)
+    cstart = pd.Timestamp(CALIB_SINCE)
+    out = {}
+    for lab, ser in sigs.items():
+        s = ser.dropna()
+        calib = s[s.index >= cstart]
+        if len(calib) < 20:
+            continue
+        path = {}
+        for ts, v in s[s.index.year == year].items():
+            pct = (calib < v).mean() * 100
+            path[ts.month] = (q_from_pct(pct), round(float(v), 0))
+        if path:
+            out[lab] = path
+    return out
+
+
+def describe_path(path: dict) -> str:
+    """월별 분위 경로를 '올해 내내 5번' / '올해 4번→5번' 식으로 요약."""
+    if not path:
+        return ""
+    qs = [path[m][0] for m in sorted(path)]
+    if len(set(qs)) == 1:
+        return f"올해 내내 {qs[0]}번"
+    return f"올해 {qs[0]}번→{qs[-1]}번"
+
+
+def load_live_current() -> dict:
+    """매주 compute_signals.py 가 새로 쓴 docs/signals.json 의 '현재값'을 라벨별로.
+    {label: {yoy, percentile, zone}}. 없으면 빈 dict → config 의 고정 스냅샷으로 폴백.
+    (이게 있어야 매주 자동 갱신 때 1번 표·종합점수가 최신값으로 같이 움직임)"""
+    sj = os.path.join(HERE, "docs", "signals.json")
+    if not os.path.exists(sj):
+        return {}
+    try:
+        with open(sj, encoding="utf-8") as f:
+            data = json.load(f)
+        return {s["label"]: {"yoy": s.get("yoy"), "percentile": s.get("percentile"),
+                             "zone": s.get("zone")}
+                for s in data.get("signals", []) if "label" in s}
+    except Exception:
+        return {}
+
+
 def main() -> None:
     df = load()
     with open(os.path.join(HERE, "signal_config.yaml"), encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     sig_cfg = cfg.get("signals", {})
+    live_cur = load_live_current()   # 최신 현재값(있으면 우선) ← 매주 자동 갱신 핵심
 
     cycle_png = chart_cycle(df)
     quint_png = chart_quintile_grid(df)          # 4개 지표 × 삼성·하이닉스 = 8개 계열
     recent_png = chart_recent_exports(df)        # 최근 24개월 실제 수출 금액
     decomp_png = chart_export_decomp(df)         # 메모리 수출 금액 vs 물량 vs 단가
     q15 = both_q15(df)
+
+    # 3번 섹션 그림 x축과 '똑같은' 칸 경계(작년比 %) — 설명 문장에 그대로 주입(숫자 어긋남 방지)
+    _dwe = windowed(df, CALIB_SINCE)
+    _e = quintile_edges(_dwe, build_signals(_dwe)["반도체수출 YoY"])  # 6개 edge
+    b1, mid_lo, mid_hi, b5 = _e[1], _e[2], _e[3], _e[4]
 
     # '지금 수출 어떻게 가나' 문장용 실데이터 — 금액·물량·단가로 분해
     from analyze import yoy as _yoy
@@ -109,7 +174,7 @@ def main() -> None:
     # 종합 신호등 점수: 매수권 +가중치 / 매도권 -가중치
     score = 0.0
     for lab, c in sig_cfg.items():
-        z = c["current"]["zone"]
+        z = (live_cur.get(lab) or c.get("current", {})).get("zone")
         if z == "매수권":
             score += c["weight"]
         elif z == "매도권":
@@ -132,7 +197,7 @@ def main() -> None:
         if lab not in sig_cfg:
             continue
         desc, star, trust = META[lab]
-        cur = sig_cfg[lab]["current"]
+        cur = live_cur.get(lab) or sig_cfg[lab]["current"]
         q = q_from_pct(cur.get("percentile", 50))
         if lab in q15 and lab != "원달러 YoY":
             s = q15[lab].get("삼성전자")
@@ -151,6 +216,54 @@ def main() -> None:
           <td>{yoy_cell(cur['yoy'])}</td>
           <td>{sam}</td>
           <td>{hyn}</td></tr>"""
+
+    # 3번 섹션용 — 올해 월별 분위(칸) 이동 표. 원달러는 방향 반대라 제외(섹션1에서 따로).
+    traj_all = yearly_quintile_path(df, dt.date.today().year)
+    traj = {k: traj_all[k] for k in ("반도체수출 YoY", "메모리수출 YoY", "SOX YoY", "마이크론 YoY") if k in traj_all}
+    traj_table_html = ""
+    if traj:
+        exp_last = [max(traj[l]) for l in ("반도체수출 YoY", "메모리수출 YoY") if l in traj]
+        all_m = {m for p in traj.values() for m in p}
+        frontier = max(exp_last) if exp_last else max(all_m)
+        months = sorted(m for m in all_m if m <= frontier)
+        head_m = "".join(f"<th>{m}월</th>" for m in months)
+
+        def _path_to(lab):
+            return {m: traj[lab][m] for m in months if m in traj.get(lab, {})}
+
+        traj_rows = ""
+        for lab in traj:
+            p = _path_to(lab)
+            cells = "".join(
+                (f'<td><span class="qbin" style="background:{_bin_color(p[m][0])}">{p[m][0]}</span></td>'
+                 if m in p else '<td><span class="muted">·</span></td>')
+                for m in months)
+            qs = [p[m][0] for m in months if m in p]
+            last_q = qs[-1] if qs else 3
+            tag = "천장권(비쌀 때)" if last_q >= 4 else ("바닥권(쌀 때)" if last_q <= 2 else "중간")
+            move = describe_path(p).replace("올해 ", "")
+            traj_rows += (f'<tr><td class="name"><b>{lab.replace(" YoY", "")}</b></td>{cells}'
+                          f'<td><b>{move}</b><br><span class="muted">{tag}</span></td></tr>')
+
+        semi_p, mem_p = _path_to("반도체수출 YoY"), _path_to("메모리수출 YoY")
+        sq = semi_p[max(semi_p)][0] if semi_p else "—"
+        mq = mem_p[max(mem_p)][0] if mem_p else "—"
+        both_top = isinstance(sq, int) and sq >= 4 and isinstance(mq, int) and mq >= 4
+        closing = ("<b>올해 줄곧 역사적 최고가 구간(천장권)</b>에 머물러 있습니다."
+                   if both_top else "위 칸 이동을 그대로 참고하세요.")
+        traj_table_html = f"""
+    <div class="step"><b>지금 어느 칸에 있나 — 올해 어떻게 움직였나.</b><br>
+      위 그림 x축의 <b>1~5번을 그대로</b> 써서, 가장 믿을만한 네 지표가 <b>올해 매달 몇 번 칸</b>에 있었는지입니다
+      (<b>1번 = 가장 쌀 때 … 5번 = 가장 비쌀 때</b> · 그림 막대 번호와 동일).
+      <span class="muted">초록 = 쌀 때(1·2) · 회색 = 보통(3) · 빨강 = 비쌀 때(4·5).</span></div>
+    <div class="tblwrap"><table class="rt">
+      <thead><tr><th style="text-align:left">지표</th>{head_m}<th>올해 이동</th></tr></thead>
+      <tbody>{traj_rows}</tbody>
+    </table></div>
+    <p class="big"><b>지금 위치:</b> 반도체 수출 <b>{sq}번 칸</b> · 메모리 수출 <b>{mq}번 칸</b>
+      (5칸 중 5번이 가장 비쌀 때 = 과열). 반도체 수출은 {describe_path(semi_p)}, 메모리 수출은 {describe_path(mem_p)} 칸에 머물러 —
+      {closing}
+      <span class="muted">※ 원/달러는 방향이 반대인 보조지표라 위 1번 표에서 따로 봅니다.</span></p>"""
 
     today = dt.date.today().isoformat()
     style = """
@@ -178,6 +291,8 @@ def main() -> None:
             padding:3px 11px;border-radius:999px;white-space:nowrap}
       .qdots{display:inline-flex;gap:3px;align-items:center;margin-right:6px;vertical-align:middle}
       .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+      .qbin{display:inline-block;min-width:24px;height:24px;line-height:24px;border-radius:6px;
+            color:#fff;font-weight:700;font-size:.85rem;text-align:center;padding:0 4px}
       .stars{color:#ff9f0a;letter-spacing:1px;white-space:nowrap;font-size:.95rem}
       .step{background:#f5f5f7;border-radius:12px;padding:16px 20px;margin:1em 0}
       .step b{color:#0071e3}
@@ -189,7 +304,7 @@ def main() -> None:
 
     body = f"""
     <h1>반도체 사이클 — 지금 사야 할 때? 팔아야 할 때?</h1>
-    <p class="muted">쉬운 설명판 v2 · {today} · 삼성전자·SK하이닉스</p>
+    <p class="muted">쉬운 설명판 v3 · {today} · 삼성전자·SK하이닉스</p>
     <p class="lead">이 도구는 딱 한 가지를 알려줍니다 — <b>지금 반도체 주식이 '바닥권(쌀 때)'이냐 '천장권(비쌀 때)'이냐.</b>
     주가 차트는 안 봅니다. 실제 반도체 수출·업황 같은 <b>펀더멘털(실물 지표)</b>만 씁니다.</p>
 
@@ -204,9 +319,9 @@ def main() -> None:
           <th rowspan="2" class="lh">지표<br><span class="th-sub">무엇을 보나</span></th>
           <th rowspan="2">신뢰도</th>
           <th rowspan="2">현재<br>신호</th>
-          <th rowspan="2">지금 위치<br><span class="th-sub">◀바닥 … 천장▶</span></th>
+          <th rowspan="2">지금 위치<br><span class="th-sub">◀1번 바닥 … 천장 5번▶</span></th>
           <th rowspan="2">작년 같은<br>달 대비</th>
-          <th colspan="2">바닥(Q1)에 샀다면 1년 뒤 수익</th>
+          <th colspan="2">1번(바닥)에 샀다면 1년 뒤 수익</th>
         </tr>
         <tr><th class="sub">삼성전자</th><th class="sub">SK하이닉스</th></tr>
       </thead>
@@ -216,9 +331,9 @@ def main() -> None:
       · <b>신뢰도</b> — ★★★ 반도체·메모리 수출은 <b>실제 통관된 실물 금액</b>이라 가장 믿을만.
         ★★ SOX·마이크론은 미국 '<b>주가</b>'라 주가로 주가를 맞히는 셈이어서 보조. ★ 환율은 거드는 정도.<br>
       · <b>현재 신호</b> — 🟢매수(쌀 때) / ⚪중립 / 🔴매도(비쌀 때).<br>
-      · <b>지금 위치</b> — 20년 줄세우기에서 어느 칸(Q). 점이 <b>왼쪽(Q1)=바닥, 오른쪽(Q5)=천장.</b><br>
+      · <b>지금 위치</b> — 20년 줄세우기에서 몇 번 칸. 점이 <b>왼쪽=1번(바닥), 오른쪽=5번(천장)</b> — <b>3번 섹션 그림·표의 번호와 똑같습니다.</b><br>
       · <b>작년 같은 달 대비</b> — 1년 전 같은 달보다 그 지표가 몇 % 변했나 (▲빨강=늘었다, ▼파랑=줄었다).<br>
-      · <b>바닥(Q1)에 샀다면</b> — 과거에 그 지표가 가장 쌀 때(Q1) 사서 1년 묵혔으면 주가가 평균 몇 % 올랐나.<br>
+      · <b>1번(바닥)에 샀다면</b> — 과거에 그 지표가 가장 쌀 때(1번 칸) 사서 1년 묵혔으면 주가가 평균 몇 % 올랐나.<br>
       <span class="muted">¹ 원달러는 '높을수록 수출 유리'라 방향이 반대 — 바닥이 좋은 게 아니어서 같은 칸으로 비교 못 합니다.</span></div>
 
     <h2>2. 지금 수출이 실제로 어떻게 가고 있나</h2>
@@ -243,26 +358,28 @@ def main() -> None:
 
     <h2>3. 어떻게 판단하나 (이 그림이 핵심)</h2>
     <div class="step">
-      <b>5칸(구간)으로 줄 세우기 — 무엇을 기준으로?</b><br>
-      각 지표의 <b>'작년 같은 달 대비 몇 %'(= 금액·달러 기준 증가율)</b>를 지난 20년(2013년~) 치 전부 모아
-      <b>크기순으로 줄 세운 뒤 20%씩 5칸</b>으로 나눕니다.
-      <span class="muted">※ 수량(개수)이 아니라 <b>금액(달러)</b> 기준입니다.</span><br>
-      예로 <b>반도체 수출</b>은 이렇게 갈립니다 (아래 그림 왼쪽 위 칸 x축 숫자와 동일):<br>
-      · <b>가장 쌀 때(침체)</b> = 작년比 <b>≤ −9%</b> (수출 줄던 2009·2019·2023 불황기)<br>
-      · <b>한가운데(보통)</b> = 작년比 <b>+5 ~ +15%</b><br>
-      · <b>가장 비쌀 때(과열)</b> = 작년比 <b>≥ +37%</b><br>
-      <b>지금은?</b> 반도체 수출이 작년比 <b>+{semi['yoy']:.0f}%</b> — +37% 선을 한참 넘어 <b>20년 중 상위 1%, 가장 비싼 칸(과열)</b>입니다.
+      <b>5칸으로 줄 세우고 1~5번 번호 붙이기 — 무엇을 기준으로?</b><br>
+      각 지표의 <b>'작년 같은 달 대비 몇 %'(= 금액·달러 기준 증가율)</b>를 2013년 이후 전부 모아
+      <b>크기순으로 줄 세운 뒤 20%씩 5칸</b>으로 나누고, 싼 쪽부터 <b>1번~5번</b>을 붙입니다.
+      <b>이 1~5번이 아래 그림 x축에도, 맨 아래 표에도 똑같이 쓰입니다.</b>
+      <span class="muted">※ 수량(개수)이 아니라 금액(달러) 기준.</span><br>
+      예로 <b>반도체 수출</b>은 이렇게 갈립니다 (아래 그림 왼쪽 위 칸 x축과 동일한 숫자):<br>
+      · <b style="color:#34c759">1번 칸 = 가장 쌀 때(침체)</b> = 작년比 <b>≤ {b1:+.0f}%</b> (수출 줄던 불황기)<br>
+      · <b style="color:#8e8e93">3번 칸 = 한가운데(보통)</b> = 작년比 <b>{mid_lo:+.0f} ~ {mid_hi:+.0f}%</b><br>
+      · <b style="color:#ff3b30">5번 칸 = 가장 비쌀 때(과열)</b> = 작년比 <b>≥ {b5:+.0f}%</b><br>
+      <b>지금은?</b> 반도체 수출이 작년比 <b>+{semi['yoy']:.0f}%</b> — {b5:+.0f}% 선을 한참 넘어 <b>5번 칸(가장 비쌈·과열)</b>입니다.
     </div>
     <div class="warn"><b>막대 높이가 헷갈리지 않게 — 꼭 읽으세요.</b>
       아래 막대 높이는 <b>지표 숫자가 아니라 '그때 샀으면 삼성·하이닉스 주가가 1년 뒤 얼마 올랐나(주가 수익률)'</b>입니다
       (막대 위 숫자가 그 수익률). <b>파랑=삼성전자, 주황=SK하이닉스.</b>
       그림 4개는 가장 믿을만한 지표 4개(반도체수출·메모리수출·SOX·마이크론),
-      각 그림 <b>x축 숫자는 그 지표의 '작년比 구간'</b> — 왼쪽일수록 쌀 때, 오른쪽일수록 비쌀 때입니다.</div>
+      각 그림 <b>x축의 1번~5번</b>이 그 지표의 작년比 구간 — <b>1번=가장 쌀 때 … 5번=가장 비쌀 때</b>입니다
+      (초록 1·2번 / 회색 3번 / 빨강 4·5번 — <b>맨 아래 표와 똑같은 번호·색</b>).</div>
     <img src="data:image/png;base64,{quint_png}">
-    <p class="big"><b>읽는 법:</b> 네 지표 모두 <b>왼쪽(쌀 때)에서 사면 1년 뒤 수익이 크고, 오른쪽(비쌀 때)으로 갈수록 막대가 낮아집니다</b>
-    — 비쌀 때 산 칸은 수익이 0 근처거나 손해. = <b>쌀 때 사고 비쌀 때 팔라</b>를 20년 데이터가 한목소리로 보여줍니다.
-    그리고 <b>지금은 네 지표 모두 맨 오른쪽 칸(과열)</b>에 들어가 있습니다.</p>
-
+    <p class="big"><b>읽는 법:</b> 네 지표 모두 <b>1번(쌀 때)에서 사면 1년 뒤 수익이 크고, 5번 쪽(비쌀 때)으로 갈수록 막대가 낮아집니다</b>
+    — 비쌀 때(4·5번) 산 칸은 수익이 0 근처거나 손해. = <b>쌀 때(1번) 사고 비쌀 때(5번) 팔라</b>를 20년 데이터가 한목소리로 보여줍니다.
+    그리고 <b>지금은 네 지표 모두 5번 칸(과열)</b>입니다 — 바로 아래 표가 그 5번을 올해 월별로 보여줍니다.</p>
+    {traj_table_html}
     <h2>4. 20년 그림으로 보기</h2>
     <img src="data:image/png;base64,{cycle_png}">
     <p class="big">아래 칸(수출 증가율)이 <b>바닥을 칠 때마다</b> 위 칸(주가)도 바닥이었고, <b>치솟을 때</b> 주가도 천장이었습니다.
@@ -279,8 +396,8 @@ def main() -> None:
     """
     out = f"<!doctype html><html lang='ko'><head><meta charset='utf-8'>" \
           f"<meta name='viewport' content='width=device-width,initial-scale=1'>" \
-          f"<title>반도체 사이클 쉬운 리포트 v2</title>{style}</head><body>{body}</body></html>"
-    out_path = os.path.join(REPORTS, "백테스트_리포트_v2.html")
+          f"<title>반도체 사이클 쉬운 리포트 v3</title>{style}</head><body>{body}</body></html>"
+    out_path = os.path.join(REPORTS, "백테스트_리포트_v3.html")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(out)
     print("저장:", out_path, "|", round(len(out) / 1024, 1), "KB | 종합점수", round(score, 2), verdict)

@@ -78,6 +78,97 @@ def score_gauge(score: float) -> str:
         '</div>')
 
 
+def _bin_color(q: int) -> str:
+    """칸 색 — 낮을수록(쌀 때) 초록, 가운데 회색, 높을수록(비쌀 때) 빨강. 리포트와 동일."""
+    if q <= 2:
+        return "#34c759"
+    if q >= 4:
+        return "#ff3b30"
+    return "#8e8e93"
+
+
+def qbar_chart(bt_q: list, cur_q: int) -> str:
+    """한 지표의 '칸별 1년 성적표' 미니 막대그래프(인라인 SVG).
+    x축 = 1~5번 칸(1=가장 쌀 때 … 5=가장 비쌀 때), 막대높이 = 그 칸일 때 사서 1년 뒤 평균수익%.
+    색은 _bin_color(쌀 때 초록·보통 회색·비쌀 때 빨강), '지금' 칸은 진하게+번호칩 강조."""
+    vals = [(v if isinstance(v, (int, float)) else 0.0) for v in (bt_q or [0] * 5)]
+    mx = max(vals + [1.0])
+    W, H = 156, 106
+    x0, x1, base, top = 12, 148, 76, 24
+    maxh = base - top
+    slot = (x1 - x0) / 5
+    bw = slot * 0.6
+    parts = [f'<line x1="{x0}" y1="{base}" x2="{x1}" y2="{base}" stroke="#d2d2d7" stroke-width="1"/>']
+    for i, v in enumerate(vals):
+        q = i + 1
+        col = _bin_color(q)
+        h = max(2.0, (v / mx) * maxh) if v > 0 else 2.0
+        bx = x0 + slot * i + (slot - bw) / 2
+        by = base - h
+        cx = bx + bw / 2
+        cur = (q == cur_q)
+        op = "1" if cur else "0.4"
+        if cur:
+            parts.append(f'<rect x="{bx - 4:.1f}" y="{top - 8:.1f}" width="{bw + 8:.1f}" '
+                         f'height="{base - top + 30:.1f}" rx="6" fill="#0071e3" fill-opacity="0.07"/>')
+        parts.append(f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{h:.1f}" '
+                     f'rx="3" fill="{col}" opacity="{op}"/>')
+        parts.append(f'<text x="{cx:.1f}" y="{by - 3:.1f}" text-anchor="middle" font-size="8.5" '
+                     f'fill="{col}" opacity="{op}" font-weight="700">{v:.0f}%</text>')
+        if cur:
+            parts.append(f'<rect x="{cx - 9:.1f}" y="{base + 6:.1f}" width="18" height="15" rx="4" fill="{col}"/>')
+            parts.append(f'<text x="{cx:.1f}" y="{base + 17:.1f}" text-anchor="middle" font-size="9.5" '
+                         f'fill="#fff" font-weight="700">{q}</text>')
+        else:
+            parts.append(f'<text x="{cx:.1f}" y="{base + 17:.1f}" text-anchor="middle" font-size="9.5" '
+                         f'fill="#8e8e93">{q}</text>')
+    return (f'<svg viewBox="0 0 {W} {H}" class="qbar" width="100%" '
+            f'preserveAspectRatio="xMidYMid meet">{"".join(parts)}</svg>')
+
+
+# 사이클 지표(작년比 낮을수록 쌀 때) — 원달러는 방향 반대라 이 그래프에서 제외(카드에서 따로).
+CYCLE_LABELS = ["반도체수출 YoY", "메모리수출 YoY", "SOX YoY", "마이크론 YoY"]
+
+
+def cycle_block(d: dict) -> str:
+    """'칸별 1년 성적표' 그래프 4개 + 밑에 1~5번 설명 — 리포트 3번 섹션과 같은 말로 동기화."""
+    by_label = {s["label"]: s for s in d["signals"]}
+    cells = ""
+    for lab in CYCLE_LABELS:
+        s = by_label.get(lab)
+        if not s or not s.get("bt_q") or all(v is None for v in s["bt_q"]):
+            continue
+        q = int(s["q"])
+        chart = qbar_chart(s["bt_q"], q)
+        cells += (f'<div class="qcell"><div class="qcap">{html.escape(s["name"])} '
+                  f'<span class="stars">{s["stars"]}</span></div>{chart}'
+                  f'<div class="qnow">지금 <b style="color:{_bin_color(q)}">{q}번 칸</b></div></div>')
+    if not cells:
+        return ""
+    head = by_label.get("반도체수출 YoY", {})
+    bp = head.get("bins_pct") or [None, None, None, None]
+    p20, p80 = bp[0], bp[3]
+    rng = ""
+    if isinstance(p20, (int, float)) and isinstance(p80, (int, float)):
+        rng = (f' 가장 믿을만한 <b>반도체 수출</b>은 작년比 <b>≤{p20:+.0f}%</b>면 1번(쌀 때), '
+               f'<b>≥{p80:+.0f}%</b>면 5번(비쌀 때)인데 — 지금은 한참 위입니다.')
+    return f"""
+      <div class="sec">
+        <div class="sech">지금 사이클 어느 칸? — 20년 칸별 성적표</div>
+        <div class="qgrid">{cells}</div>
+        <div class="qexp">
+          각 지표의 <b>작년 같은 달 대비 증가율</b>을 2013년 이후 줄세워 <b>5칸(1번~5번)</b>으로 나눈 것입니다.
+          막대 = 그 칸일 때 사서 <b>1년 묵혔으면 평균 몇 % 올랐나</b>(20년 백테스트).
+          <b style="color:#34c759">1번(가장 쌀 때)</b>에 살수록 수익이 크고
+          <b style="color:#ff3b30">5번(가장 비쌀 때)</b>일수록 0에 가깝거나 손해 —
+          <span class="muted">초록=쌀 때(1·2) · 회색=보통(3) · 빨강=비쌀 때(4·5).</span><br>
+          <b>지금은 네 지표 모두 5번 칸</b>입니다.{rng}
+          역사적으로 5번은 <b>사는 자리가 아니라 파는 자리</b>였습니다.
+          <span class="muted">※ 원/달러는 방향이 반대인 보조지표라 아래 카드에서 따로 봅니다.</span>
+        </div>
+      </div>"""
+
+
 def main() -> None:
     with open(os.path.join(DOCS, "signals.json"), encoding="utf-8") as f:
         d = json.load(f)
@@ -95,7 +186,7 @@ def main() -> None:
           </div>
           <div class="crow">
             <div class="kv"><span class="k">작년 같은 달 대비</span>{yoy_badge(s['yoy'])}</div>
-            <div class="kv"><span class="k">20년 중 위치</span><b>상위 {100 - s['percentile']:.0f}%</b> · Q{s['q']}</div>
+            <div class="kv"><span class="k">20년 중 위치</span><b>상위 {100 - s['percentile']:.0f}%</b> · {s['q']}번 칸</div>
             <div class="sp">{spark}<span class="splab">최근 24개월</span></div>
           </div>
           {pos_gauge(s['percentile'], s['zone'], s['direction'])}
@@ -143,9 +234,20 @@ def main() -> None:
       .foot{background:#fff4e5;border-left:4px solid #ff9500;border-radius:10px;padding:13px 16px;margin-top:18px;font-size:.82rem}
       .foot ul{margin:.4em 0;padding-left:1.1em} .foot li{margin:.25em 0}
       .src{color:#8e8e93;font-size:.72rem;margin-top:14px;text-align:center}
+      .sec{background:#fff;border:1px solid #e5e5ea;border-radius:16px;padding:15px 16px;margin:14px 0;
+           box-shadow:0 1px 3px rgba(0,0,0,.04)}
+      .sech{font-weight:700;font-size:1.02rem;margin-bottom:10px}
+      .qgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px 6px}
+      .qcell{text-align:center;padding:4px 2px}
+      .qcap{font-size:.8rem;font-weight:600;line-height:1.3}
+      .qcap .stars{color:#ff9f0a;font-size:.72rem;margin-left:2px}
+      .qbar{display:block;margin:1px auto 0}
+      .qnow{font-size:.74rem;color:#8e8e93;margin-top:1px}
+      .qexp{font-size:.82rem;color:#3a3a3c;margin-top:11px;padding-top:11px;border-top:1px solid #f0f0f2;line-height:1.65}
       @media(prefers-color-scheme:dark){
-        body{background:#000;color:#f5f5f7} .card{background:#1c1c1e;border-color:#2c2c2e}
-        .thr{color:#c7c7cc;border-top-color:#2c2c2e} .sub,.trust,.gax,.sax,.splab,.src,.kv .k{color:#8e8e93}
+        body{background:#000;color:#f5f5f7} .card,.sec{background:#1c1c1e;border-color:#2c2c2e}
+        .thr{color:#c7c7cc;border-top-color:#2c2c2e} .sub,.trust,.gax,.sax,.splab,.src,.kv .k,.qnow{color:#8e8e93}
+        .qexp{color:#c7c7cc;border-top-color:#2c2c2e}
         .foot{background:#2a2113;color:#f5f5f7}}
     </style>"""
 
@@ -160,6 +262,8 @@ def main() -> None:
         <div class="vs">종합점수 {comp['score']:+.2f} · 5개 지표를 신뢰도(가중치)로 합산</div>
       </div>
       {score_gauge(comp['score'])}
+
+      {cycle_block(d)}
 
       {cards}
 

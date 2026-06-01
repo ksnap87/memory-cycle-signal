@@ -85,6 +85,15 @@ def main() -> None:
 
         name, stars, trust = META.get(lab, (lab, "", ""))
         spark = [round(float(v), 1) for v in s.iloc[-SPARK_MONTHS:].tolist()]
+        # 20년 칸(1~5번)별 '그때 샀으면 1년 뒤 평균수익%' — Phase A 백테스트 결과(고정).
+        # 대시보드 '칸별 성적표' 막대그래프용. 매주 재계산 안 함(보정창 고정값).
+        bt_q = [None] * 5
+        for item in c.get("backtest_quintiles", []):
+            qi = int(item.get("q", 0))
+            if 1 <= qi <= 5:
+                bt_q[qi - 1] = round(float(item.get("fwd12_mean", 0.0)), 1)
+        qb = c.get("quintile_boundaries", {}) or {}
+        bins_pct = [qb.get("P20"), qb.get("P40"), qb.get("P60"), qb.get("P80")]
         out_signals.append({
             "label": lab, "name": name, "stars": stars, "trust": trust,
             "direction": direction, "yoy": round(latest, 1), "percentile": pct,
@@ -92,6 +101,8 @@ def main() -> None:
             "thresholds": c["thresholds"],
             "asof": s.index[-1].strftime("%Y-%m"),
             "spark": spark,
+            "bt_q": bt_q,
+            "bins_pct": bins_pct,
         })
 
     score = round(score, 3)
@@ -136,7 +147,7 @@ def main() -> None:
     print(f"  주가 {price_through} / 수출 {exp_through}")
     for s in out_signals:
         print(f"  {s['name']:14s} {s['stars']:3s} | {s['zone']:4s} | "
-              f"YoY {s['yoy']:+7.1f}% (상위 {100 - s['percentile']:.0f}%) Q{s['q']}")
+              f"YoY {s['yoy']:+7.1f}% (상위 {100 - s['percentile']:.0f}%) {s['q']}번")
 
 
 if __name__ == "__main__":

@@ -164,10 +164,14 @@ def chart_quintile_grid(df: pd.DataFrame) -> str:
                          fontweight="bold", color="#1d1d1f")
         ax.axhline(0, color="#1d1d1f", lw=0.9)
         ax.set_xticks(x)
-        ax.set_xticklabels(edge_ticklabels(e), fontsize=8.4)
-        ax.set_title(PLAIN_LABEL.get(lab, lab) + " — 작년比 변화율 구간",
+        # 칸마다 '1번~5번' 번호 + 작년比 구간 → 표·설명과 같은 번호로 매칭
+        ax.set_xticklabels([f"{i}번\n{r}" for i, r in zip(range(1, 6), edge_ticklabels(e))],
+                           fontsize=7.8)
+        for i, tk in enumerate(ax.get_xticklabels()):       # 표 배지와 동일 색(쌀 때 초록 … 비쌀 때 빨강)
+            tk.set_color("#34c759" if i < 2 else ("#ff3b30" if i >= 3 else "#8e8e93"))
+        ax.set_title(PLAIN_LABEL.get(lab, lab) + " — 작년比 변화율 구간(1~5번 칸)",
                      fontsize=11, fontweight="bold", loc="left", color="#1d1d1f")
-        ax.set_xlabel("← 침체(쌀 때) ······ 과열(비쌀 때) →", fontsize=8.6, color="#8e8e93")
+        ax.set_xlabel("1번(쌀 때·침체) ←······→ 5번(비쌀 때·과열)", fontsize=8.6, color="#8e8e93")
         ax.set_ylabel("1년 뒤 수익률(%)", fontsize=9.5)
         ax.grid(True, axis="y", alpha=0.22)
         ax.margins(y=0.22)

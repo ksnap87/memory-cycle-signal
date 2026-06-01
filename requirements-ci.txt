@@ -1,6 +1,9 @@
-# 클라우드 주간 갱신(Phase B)에 필요한 최소 패키지 — CI를 가볍고 빠르게.
+# 클라우드 주간 갱신(Phase B)에 필요한 패키지.
+# matplotlib = 리포트(쉬운 설명판)의 수출 꺾은선·분위 차트 렌더용.
+#   (한글 폰트는 weekly.yml 에서 apt fonts-nanum 으로 설치 — 안 그러면 차트 한글이 □□□ 됨)
 yfinance>=0.2
 pandas>=2.0
 numpy>=1.24
 requests>=2.31
 PyYAML>=6.0
+matplotlib>=3.7
