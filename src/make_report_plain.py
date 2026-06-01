@@ -12,7 +12,7 @@ import datetime as dt
 import pandas as pd
 import yaml
 
-from analyze import load, build_signals, quintile_backtest, TARGETS, HERE
+from analyze import load, build_signals, quintile_backtest, lead_lag_table, TARGETS, HERE
 from chart_data import (data_cycle, data_quintile_grid, data_recent_exports,
                         data_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
 
@@ -227,6 +227,21 @@ def load_live_current() -> dict:
         return {}
 
 
+def leadlag_summary(df: pd.DataFrame) -> dict:
+    """수출이 주가를 '몇 개월' 앞서나 + '얼마나 맞나(상관)' — 전체 20년 vs 2013년 이후.
+    analyze.lead_lag_table 를 그대로 재사용(숫자 어긋남 방지). 각 (종목,시그널)에서
+    상관이 최대가 되는 선행개월 h(1/3/6/12) 를 채택 → {window: {(종목,시그널): {h,corr}}}."""
+    def best(sub: pd.DataFrame) -> dict:
+        sigs = build_signals(sub)
+        ll = lead_lag_table(sub, sigs).dropna(subset=["상관"])
+        if ll.empty:
+            return {}
+        bh = ll.loc[ll.groupby(["타깃", "시그널"])["상관"].idxmax()]
+        return {(r["타깃"], r["시그널"]): {"h": int(r["선행개월"]), "corr": float(r["상관"])}
+                for _, r in bh.iterrows()}
+    return {"full": best(df), "c2013": best(windowed(df, CALIB_SINCE))}
+
+
 def main() -> None:
     df = load()
     with open(os.path.join(HERE, "signal_config.yaml"), encoding="utf-8") as f:
@@ -368,6 +383,53 @@ def main() -> None:
       {closing}
       <span class="muted">※ 원/달러는 방향이 반대인 보조지표라 위 1번 표에서 따로 봅니다.</span></p>"""
 
+    # 5번 섹션 — 수출이 주가를 '몇 개월 앞서나'(선행성). analyze.lead_lag_table 재사용.
+    lls = leadlag_summary(df)
+
+    def _ll_row(sig: str, tgt: str, name: str) -> str:
+        a = lls["c2013"].get((tgt, sig))
+        if not a:
+            return ""
+        b = lls["full"].get((tgt, sig))
+        h, c2 = a["h"], a["corr"]
+        cf = b["corr"] if b else None
+        barw = max(6, min(100, c2 / 0.5 * 100))     # 0.5 만점 환산(과대표현 방지)
+        return (f'<tr><td class="name"><b>{name}</b></td>'
+                f'<td><b>{h}개월</b></td>'
+                f'<td><b>{c2:.2f}</b><div class="mbar"><span style="width:{barw:.0f}%"></span></div></td>'
+                f'<td>{("%.2f" % cf) if cf is not None else "—"}</td></tr>')
+
+    ll_rows = "".join([
+        _ll_row("메모리수출 YoY", "SK하이닉스", "메모리수출 → 하이닉스"),
+        _ll_row("반도체수출 YoY", "SK하이닉스", "반도체수출 → 하이닉스"),
+        _ll_row("메모리수출 YoY", "삼성전자", "메모리수출 → 삼성"),
+        _ll_row("반도체수출 YoY", "삼성전자", "반도체수출 → 삼성"),
+    ])
+    leadlag_section = ""
+    if ll_rows.strip():
+        leadlag_section = f"""
+    <h2>5. 수출이 주가를 '얼마나 앞서' 가나? (선행성)</h2>
+    <div class="step"><b>한 줄 답 — 수출은 주가를 1~3개월 앞서지만, 그 힘은 약합니다.</b><br>
+      수출이 오르면 1~3개월 뒤 주가도 오르는 경향이 있지만 '같이 움직이는 정도(상관)'가 <b>0.3을 거의 못 넘습니다</b>
+      (1.0=완벽히 일치 · 0=무관). 즉 <b>수출 보고 '몇 달 뒤 주가'를 콕 맞히는 용도로는 약해요.</b>
+      대신 3번의 <b>"수출 증가율이 바닥일 때 = 사이클 저점"</b> 신호로는 강력합니다(그때 사면 1년 뒤 승률 90%+).</div>
+    <div class="tblwrap"><table class="rt">
+      <thead><tr>
+        <th style="text-align:left">수출 → 종목</th>
+        <th>몇 개월<br>앞서나</th>
+        <th>맞는 정도<br><span class="th-sub">2013년~ · 0~1, 높을수록 강함</span></th>
+        <th>전체<br>20년</th>
+      </tr></thead>
+      <tbody>{ll_rows}</tbody>
+    </table></div>
+    <p class="big"><b>표에서 세 가지가 더 드러납니다.</b><br>
+      · <b>하이닉스 &gt; 삼성</b> — 순수 메모리주(하이닉스)에 훨씬 잘 맞습니다. 삼성은 폰·파운드리가 섞여 신호가 희석돼요.<br>
+      · <b>메모리수출 &gt; 반도체수출 전체</b> — D램·낸드만 떼어 보는 게 더 정확(삼성·하이닉스 매출에 직결).<br>
+      · <b>2013년 이후 더 또렷</b> — 3사 과점(삼성·하이닉스·마이크론)이 자리잡은 뒤 신호가 약 2배로 강해졌습니다.</p>
+    <div class="warn"><b>그래서 '체온계'입니다.</b>
+      짧게(1~3개월)는 수출과 주가가 같이 가고, 길게(12개월)는 거꾸로 — <b>수출이 폭락한 바닥에서 산 게 1년 뒤 가장 크게 올랐습니다</b>(3번 표).
+      이 도구가 '며칠에 사라'는 정밀 시계가 아니라 <b>지금이 바닥권이냐 천장권이냐를 재는 체온계</b>인 이유입니다.</div>"""
+
     today = dt.date.today().isoformat()
     style = """
     <style>
@@ -403,6 +465,8 @@ def main() -> None:
       .muted{color:#8e8e93;font-size:.82rem}
       img{max-width:100%;border-radius:10px;border:1px solid #e5e5ea;margin:.4em 0}
       .big{font-size:1.1rem}
+      .mbar{height:6px;background:#eef0f2;border-radius:3px;margin-top:5px;overflow:hidden;min-width:54px}
+      .mbar span{display:block;height:100%;background:#0071e3;border-radius:3px}
       /* 인터랙티브 차트(반응형) — 화면 폭에 맞게 또렷하게, 손가락으로 값 확인 */
       .charthint{color:#8e8e93;font-size:.82rem;margin:.4em 0 .1em}
       .chartbox{position:relative;height:330px;margin:.6em 0;border:1px solid #e5e5ea;
@@ -500,15 +564,15 @@ def main() -> None:
     <div class="chartbox"><canvas id="cYoY"></canvas></div>
     <p class="big">아래 칸(수출 증가율)이 <b>바닥을 칠 때마다</b> 위 칸(주가)도 바닥이었고, <b>치솟을 때</b> 주가도 천장이었습니다.
     그리고 <b>맨 오른쪽 = 지금</b> — 수출 증가율이 20년 중 가장 높이 치솟아 있습니다(과열).</p>
-
-    <h2>5. 꼭 기억할 점</h2>
+    {leadlag_section}
+    <h2>6. 꼭 기억할 점</h2>
     <div class="warn">
       · 이건 <b>'사이클 체온계'</b>입니다 — "지금 뜨겁다/차갑다"는 알려주지만 <b>'며칠에 사라'까지는 못 맞힙니다.</b><br>
       · <b>지금은 20년 만의 최고 과열</b>이라 역사 기준으론 '파는 자리'. 단 <b>AI/HBM 때문에 사상 처음 보는 영역</b>이라
       "이번엔 다를" 가능성도 함께 봐야 합니다(과거에 없던 상황이라 100% 장담 불가).<br>
       · <b>투자 권유가 아니라 참고용 분석</b>입니다.
     </div>
-    <p class="muted">자료: 주가·SOX·마이크론·환율 = yfinance / 반도체·메모리 수출 = 관세청 수출입실적. 어려운 통계표(상관계수·선행성)는 전문가용이라 v1 리포트에 따로 있습니다.</p>
+    <p class="muted">자료: 주가·SOX·마이크론·환율 = yfinance / 반도체·메모리 수출 = 관세청 수출입실적. 더 자세한 통계표(전체 선행성·IC 등)는 전문가용 v1 리포트에 있습니다.</p>
     """
     # Chart.js 라이브러리(인라인) + 데이터(JSON) + 초기화 스크립트를 body 끝에 주입
     chart_json = json.dumps(chart_payload, ensure_ascii=False)
