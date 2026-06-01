@@ -1,0 +1,6 @@
+# 클라우드 주간 갱신(Phase B)에 필요한 최소 패키지 — CI를 가볍고 빠르게.
+yfinance>=0.2
+pandas>=2.0
+numpy>=1.24
+requests>=2.31
+PyYAML>=6.0

@@ -1,0 +1,203 @@
+meta:
+  generated_at: '2026-06-01'
+  calibration_window: 2013-01-01 ~ 2026-05-31
+  panel_period: 2006-01-31 ~ 2026-05-31
+  targets:
+    삼성전자: 005930.KS
+    SK하이닉스: 000660.KS
+  transform: YoY(전년대비%), 수출은 발행지연 1개월 시차
+  method: 5분위 백테스트(다음 12개월 수익률·승률) → P40/P60 임계값
+  notes:
+  - 상관≠인과. 분석용이며 투자권유 아님.
+  - 현재 시그널은 20년 중 최고 과열(99~100퍼센타일) — 학습범위 밖 외삽 주의(AI/HBM 구조변화 가능).
+  - 정밀 타이밍 아님 — '사이클 체온계'(바닥권/천장권 판별).
+composite_rule:
+  buy_signal_score: '>= 0.6'
+  sell_signal_score: <= -0.6
+  desc: 신호별 매수=+1·중립=0·매도=−1 에 weight 가중합 → [-1,+1]. 음수=과열/매도권.
+signals:
+  SOX YoY:
+    direction: low_is_buy
+    lead_months: 1
+    quintile_boundaries:
+      P20: 0.8
+      P40: 23.8
+      P60: 36.0
+      P80: 48.9
+    thresholds:
+      buy_below: 23.8
+      sell_above: 36.0
+    backtest_quintiles:
+    - q: 1
+      fwd12_mean: 86.7
+      win_rate: 97.0
+      n: 60
+    - q: 2
+      fwd12_mean: 46.1
+      win_rate: 65.0
+      n: 60
+    - q: 3
+      fwd12_mean: 16.1
+      win_rate: 57.0
+      n: 60
+    - q: 4
+      fwd12_mean: 17.2
+      win_rate: 55.0
+      n: 58
+    - q: 5
+      fwd12_mean: 13.0
+      win_rate: 52.0
+      n: 60
+    current:
+      yoy: 169.6
+      percentile: 99.0
+      zone: 매도권
+    weight: 0.249
+  마이크론 YoY:
+    direction: low_is_buy
+    lead_months: 1
+    quintile_boundaries:
+      P20: -16.2
+      P40: 15.0
+      P60: 54.6
+      P80: 109.7
+    thresholds:
+      buy_below: 15.0
+      sell_above: 54.6
+    backtest_quintiles:
+    - q: 1
+      fwd12_mean: 90.7
+      win_rate: 97.0
+      n: 60
+    - q: 2
+      fwd12_mean: 48.3
+      win_rate: 77.0
+      n: 60
+    - q: 3
+      fwd12_mean: 25.0
+      win_rate: 62.0
+      n: 60
+    - q: 4
+      fwd12_mean: 2.3
+      win_rate: 34.0
+      n: 58
+    - q: 5
+      fwd12_mean: 12.1
+      win_rate: 55.0
+      n: 60
+    current:
+      yoy: 930.4
+      percentile: 99.0
+      zone: 매도권
+    weight: 0.253
+  원달러 YoY:
+    direction: high_is_buy
+    lead_months: 1
+    quintile_boundaries:
+      P20: -3.6
+      P40: -0.4
+      P60: 3.7
+      P80: 7.8
+    thresholds:
+      buy_above: 3.7
+      sell_below: -0.4
+    backtest_quintiles:
+    - q: 1
+      fwd12_mean: 7.7
+      win_rate: 37.0
+      n: 60
+    - q: 2
+      fwd12_mean: 16.5
+      win_rate: 65.0
+      n: 60
+    - q: 3
+      fwd12_mean: 52.1
+      win_rate: 72.0
+      n: 60
+    - q: 4
+      fwd12_mean: 40.2
+      win_rate: 71.0
+      n: 58
+    - q: 5
+      fwd12_mean: 63.4
+      win_rate: 82.0
+      n: 60
+    current:
+      yoy: 10.0
+      percentile: 89.0
+      zone: 매수권
+    weight: 0.211
+  반도체수출 YoY:
+    direction: low_is_buy
+    lead_months: 1
+    quintile_boundaries:
+      P20: -6.2
+      P40: 6.5
+      P60: 18.2
+      P80: 38.4
+    thresholds:
+      buy_below: 6.5
+      sell_above: 18.2
+    backtest_quintiles:
+    - q: 1
+      fwd12_mean: 39.7
+      win_rate: 93.0
+      n: 60
+    - q: 2
+      fwd12_mean: 54.3
+      win_rate: 77.0
+      n: 60
+    - q: 3
+      fwd12_mean: 51.9
+      win_rate: 63.0
+      n: 60
+    - q: 4
+      fwd12_mean: 26.9
+      win_rate: 52.0
+      n: 58
+    - q: 5
+      fwd12_mean: 6.5
+      win_rate: 40.0
+      n: 60
+    current:
+      yoy: 158.2
+      percentile: 99.0
+      zone: 매도권
+    weight: 0.181
+  메모리수출 YoY:
+    direction: low_is_buy
+    lead_months: 1
+    quintile_boundaries:
+      P20: -8.7
+      P40: 8.8
+      P60: 29.0
+      P80: 56.0
+    thresholds:
+      buy_below: 8.8
+      sell_above: 29.0
+    backtest_quintiles:
+    - q: 1
+      fwd12_mean: 34.4
+      win_rate: 93.0
+      n: 60
+    - q: 2
+      fwd12_mean: 58.4
+      win_rate: 85.0
+      n: 60
+    - q: 3
+      fwd12_mean: 49.4
+      win_rate: 48.0
+      n: 60
+    - q: 4
+      fwd12_mean: 17.3
+      win_rate: 41.0
+      n: 58
+    - q: 5
+      fwd12_mean: 19.5
+      win_rate: 57.0
+      n: 60
+    current:
+      yoy: 261.5
+      percentile: 99.0
+      zone: 매도권
+    weight: 0.107

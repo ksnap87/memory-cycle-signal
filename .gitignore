@@ -1,0 +1,22 @@
+# 비밀키 — 절대 커밋 금지
+secrets.local.yaml
+.env
+*.key
+
+# 로컬 전용(공개 저장소엔 올리지 않음)
+.claude/
+reports/
+
+# 원본 데이터: raw 는 기본 제외하되, 공개 관세청 수출 데이터는 CI용으로 포함
+data/raw/*
+!data/raw/exports_semiconductor.csv
+
+# 대시보드 원자료(JSON)는 게시하지 않음 — 암호화된 index.html 만 공개
+docs/signals.json
+
+# 캐시/기타
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
