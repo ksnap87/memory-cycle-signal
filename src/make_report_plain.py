@@ -337,13 +337,13 @@ def canary_section_html(df: pd.DataFrame, watch: dict) -> str:
         manual = f"""
     <div class="tblwrap"><table class="rt">
       <thead><tr>
-        <th style="text-align:left">②③④ 관찰 항목 <span class="th-sub">사람이 분기마다 보는 정성 지표</span></th>
+        <th style="text-align:left">②③④ 관찰 항목 <span class="th-sub">웹 조사로 매주 자동 갱신</span></th>
         <th>현재</th>
         <th style="text-align:left">무엇을 보면 위험한가 · 어디서</th>
       </tr></thead>
       <tbody>{rows}</tbody>
     </table></div>
-    <p class="muted">②③④는 어닝콜·업계뉴스·분기보고서를 사람이 읽어야 알 수 있어 <b>자동이 안 됩니다</b> — 실적시즌마다 손으로 갱신합니다(마지막 갱신 {upd}). 매주 자동으로 움직이는 건 ①뿐입니다.</p>"""
+    <p class="muted">②③④는 어닝콜·업계뉴스·분기보고서 기반 정성 지표 — <b>매주 웹에서 자동 조사해 갱신</b>합니다(마지막 {upd}). ①은 수출 데이터로 매주 자동 계산.</p>"""
 
     z = c1["zone"]
     if z == "횡보":
@@ -357,16 +357,28 @@ def canary_section_html(df: pd.DataFrame, watch: dict) -> str:
         summ = (f"<b>① 메모리 수출 모멘텀</b>은 <b>{c1['month']}</b>까지 아직 상승세"
                 f"(전월비 {c1['mom']:+.1f}%) — <b>천장 신호 없음</b>입니다.")
 
+    items = watch.get("items") or []
+    n_flat = sum(1 for it in items if it.get("status") == "flat")
+    n_down = sum(1 for it in items if it.get("status") == "down")
+    if items and n_flat == 0 and n_down == 0:
+        manual_summ = " 반면 <b>②③④(빅테크 투자·공급·재고)는 모두 🟢</b> — 펀더멘털엔 아직 천장 신호가 없습니다."
+        if c1["zone"] == "횡보":
+            manual_summ += " 즉 ①의 횡보는 <b>1개월짜리 노이즈일 가능성</b>이 큽니다."
+    elif items:
+        manual_summ = f" ②③④ 중 <b>주의 {n_flat}개·경고 {n_down}개</b>가 떠 있어 함께 살펴야 합니다."
+    else:
+        manual_summ = ""
+
     return f"""
     <h2>6. 천장은 언제 오나 — 사이클 꼭대기 '카나리아' 4종</h2>
     <div class="step"><b>지금은 20년 만의 최고 과열(천장권). 그럼 '언제 식나'를 미리 알려줄 신호는 뭘까요?</b><br>
       옛날 광부가 갱도에 <b>카나리아(새)</b>를 데려가 위험을 먼저 감지했듯, <b>꼭대기가 가까워지면 먼저 깜빡일 4가지</b>를 모았습니다.
-      ①은 수출 데이터로 <b>매주 자동</b> 계산하고, ②③④는 사람이 분기마다 확인하는 정성 지표입니다.
+      ①은 수출 데이터로 <b>매주 자동</b> 계산하고, ②③④는 어닝콜·뉴스 기반이라 <b>매주 웹 조사로 자동 갱신</b>합니다.
       <span class="muted">🟢 아직 안전 · 🟡 주의(첫 징후) · 🔴 경고(전환).</span></div>
     {card}
     {manual}
-    <div class="warn"><b>지금 종합:</b> {summ}
-      ②(빅테크 투자)와 ④(재고)는 다음 실적시즌(7~8월)이 분수령입니다.</div>"""
+    <div class="warn"><b>지금 종합:</b> {summ}{manual_summ}
+      ②·④의 다음 분수령은 7~8월 2분기 실적입니다.</div>"""
 
 
 def main() -> None:
