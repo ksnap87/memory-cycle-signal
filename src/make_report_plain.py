@@ -12,7 +12,7 @@ import datetime as dt
 import pandas as pd
 import yaml
 
-from analyze import load, build_signals, quintile_backtest, lead_lag_table, TARGETS, HERE
+from analyze import load, build_signals, quintile_backtest, fwd_return, HORIZONS, TARGETS, HERE
 from chart_data import (data_cycle, data_quintile_grid, data_recent_exports,
                         data_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
 
@@ -229,16 +229,28 @@ def load_live_current() -> dict:
 
 def leadlag_summary(df: pd.DataFrame) -> dict:
     """수출이 주가를 '몇 개월' 앞서나 + '얼마나 맞나(상관)' — 전체 20년 vs 2013년 이후.
-    analyze.lead_lag_table 를 그대로 재사용(숫자 어긋남 방지). 각 (종목,시그널)에서
-    상관이 최대가 되는 선행개월 h(1/3/6/12) 를 채택 → {window: {(종목,시그널): {h,corr}}}."""
+    각 (종목,시그널)에서 상관(피어슨)이 최대가 되는 선행개월 h(1/3/6/12) 채택
+    → {window: {(종목,시그널): {h,corr}}}.
+    analyze.lead_lag_table 의 '피어슨 상관' 계산을 그대로 재현(숫자 동일)하되,
+    대시보드에서 안 쓰는 스피어만 IC 는 빼서 클라우드(CI)에 scipy 의존을 없앤다."""
     def best(sub: pd.DataFrame) -> dict:
         sigs = build_signals(sub)
-        ll = lead_lag_table(sub, sigs).dropna(subset=["상관"])
-        if ll.empty:
-            return {}
-        bh = ll.loc[ll.groupby(["타깃", "시그널"])["상관"].idxmax()]
-        return {(r["타깃"], r["시그널"]): {"h": int(r["선행개월"]), "corr": float(r["상관"])}
-                for _, r in bh.iterrows()}
+        out: dict = {}
+        for tgt in TARGETS:
+            for lab, sig in sigs.items():
+                bh, br = None, None
+                for h in HORIZONS:
+                    pair = pd.concat([sig, fwd_return(sub[tgt], h)], axis=1).dropna()
+                    if len(pair) < 24:
+                        continue
+                    r = round(pair.iloc[:, 0].corr(pair.iloc[:, 1]), 3)  # 피어슨(기본) — scipy 불필요
+                    if pd.isna(r):
+                        continue
+                    if br is None or r > br:        # 동률이면 더 짧은 h(먼저 만난 값) 유지 = idxmax 와 동일
+                        bh, br = h, r
+                if bh is not None:
+                    out[(tgt, lab)] = {"h": int(bh), "corr": float(br)}
+        return out
     return {"full": best(df), "c2013": best(windowed(df, CALIB_SINCE))}
 
 
