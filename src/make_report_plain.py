@@ -254,6 +254,121 @@ def leadlag_summary(df: pd.DataFrame) -> dict:
     return {"full": best(df), "c2013": best(windowed(df, CALIB_SINCE))}
 
 
+# ── 6번 섹션: 사이클 '천장 카나리아' ─────────────────────────────
+# status → (이모지, 색, 꼬리표). up=아직 안전 / flat=주의 / down=경고
+CANARY_TONE = {
+    "up":   ("🟢", "#34c759", "아직 안전"),
+    "flat": ("🟡", "#ff9500", "주의"),
+    "down": ("🔴", "#ff3b30", "경고"),
+}
+_ZONE2STATUS = {"상승": "up", "횡보": "flat", "꺾임": "down"}
+
+
+def canary_memory_momentum(df: pd.DataFrame) -> dict:
+    """카나리아 ①(자동·매주) — 메모리 수출 '금액'의 꼭대기 모멘텀.
+    사상 최고 대비 위치 · 전월비(MoM) · 3개월 추세로 신호등을 만든다.
+    천장이 가까워지면 '신고가 행진'이 먼저 멈춘다(횡보)는 점을 잡아내는 게 목적."""
+    col = "메모리수출_854232_백만$"
+    if col not in df.columns:
+        return {}
+    s = df[col].dropna()
+    if len(s) < 4:
+        return {}
+    last, prev = float(s.iloc[-1]), float(s.iloc[-2])
+    peak = float(s.max())
+    mom = (last / prev - 1.0) * 100.0
+    chg3 = (last / float(s.iloc[-4]) - 1.0) * 100.0
+    pct_peak = last / peak * 100.0
+    months_since_peak = (len(s) - 1) - int(s.values.argmax())   # 0 = 이번 달이 사상 최고
+    near_peak = pct_peak >= 98.0
+    if months_since_peak >= 2:
+        zone, head = "꺾임", "하락 전환 신호 — 사상 최고가 이후 내림세"
+    elif near_peak and mom < 3.0:
+        zone, head = "횡보", "첫 천장 근접 신호 — 신고가 행진이 멈추고 옆걸음"
+    else:
+        zone, head = "상승", "아직 상승세 — 천장 신호 없음"
+    return {"month": s.index[-1].strftime("%Y년 %m월"), "mom": mom, "chg3": chg3,
+            "pct_peak": pct_peak, "months_since_peak": months_since_peak,
+            "is_high": last >= peak - 1e-9, "zone": zone, "head": head}
+
+
+def load_canary_watch() -> dict:
+    """수동·정성 카나리아(②③④) — data/canary_watch.yaml. 없으면 빈 dict(섹션 일부 생략)."""
+    p = os.path.join(HERE, "data", "canary_watch.yaml")
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def canary_section_html(df: pd.DataFrame, watch: dict) -> str:
+    c1 = canary_memory_momentum(df)
+    if not c1:
+        return ""
+    e1, col1, _ = CANARY_TONE[_ZONE2STATUS[c1["zone"]]]
+    high_txt = "사상 최고치" if c1["is_high"] else f"고점의 {c1['pct_peak']:.0f}%"
+    card = f"""
+    <div class="canary" style="border-color:{col1}">
+      <div class="cbadge" style="background:{col1}">{e1} 카나리아 ① · 메모리 수출 모멘텀<span class="cauto">데이터 자동 · 매주</span></div>
+      <div class="chead">{c1['head']}</div>
+      <div class="cnums">
+        <div><span class="muted">최근</span><br><b>{c1['month']}</b></div>
+        <div><span class="muted">전월비</span><br><b>{c1['mom']:+.1f}%</b></div>
+        <div><span class="muted">3개월</span><br><b>{c1['chg3']:+.0f}%</b></div>
+        <div><span class="muted">고점 대비</span><br><b>{high_txt}</b></div>
+      </div>
+    </div>"""
+
+    rows = ""
+    for it in (watch.get("items") or []):
+        e, col, tail = CANARY_TONE.get(it.get("status", "up"), ("⚪", "#8e8e93", ""))
+        rows += f"""<tr>
+          <td class="name"><b>{it.get('name', '')}</b><br><span class="muted">{it.get('why', '')}</span></td>
+          <td><span class="pill" style="background:{col}">{e} {tail}</span><br><span class="muted">{it.get('note', '')}</span></td>
+          <td class="name"><span class="muted">위험 신호 →</span> {it.get('trigger', '')}<br>
+              <span class="muted">확인: {it.get('where', '')} · 다음 {it.get('next_check', '')}</span></td>
+        </tr>"""
+    upd = watch.get("updated", "")
+    manual = ""
+    if rows:
+        manual = f"""
+    <div class="tblwrap"><table class="rt">
+      <thead><tr>
+        <th style="text-align:left">②③④ 관찰 항목 <span class="th-sub">사람이 분기마다 보는 정성 지표</span></th>
+        <th>현재</th>
+        <th style="text-align:left">무엇을 보면 위험한가 · 어디서</th>
+      </tr></thead>
+      <tbody>{rows}</tbody>
+    </table></div>
+    <p class="muted">②③④는 어닝콜·업계뉴스·분기보고서를 사람이 읽어야 알 수 있어 <b>자동이 안 됩니다</b> — 실적시즌마다 손으로 갱신합니다(마지막 갱신 {upd}). 매주 자동으로 움직이는 건 ①뿐입니다.</p>"""
+
+    z = c1["zone"]
+    if z == "횡보":
+        summ = (f"가장 빠른 카나리아인 <b>① 메모리 수출 모멘텀</b>이 <b>{c1['month']}</b> 신고가 행진을 멈추고 "
+                f"옆걸음(전월비 {c1['mom']:+.1f}%)으로 돌아서며 <b>첫 천장 근접 신호</b>를 냈습니다. "
+                f"단 한 달짜리라 확정은 아니며 <b>다음 달 수치가 갈림길</b>입니다.")
+    elif z == "꺾임":
+        summ = (f"<b>① 메모리 수출 모멘텀</b>이 <b>{c1['month']}</b> 기준 사상 최고가 이후 "
+                f"{c1['months_since_peak']}개월 내림세 — <b>하락 전환 신호</b>입니다.")
+    else:
+        summ = (f"<b>① 메모리 수출 모멘텀</b>은 <b>{c1['month']}</b>까지 아직 상승세"
+                f"(전월비 {c1['mom']:+.1f}%) — <b>천장 신호 없음</b>입니다.")
+
+    return f"""
+    <h2>6. 천장은 언제 오나 — 사이클 꼭대기 '카나리아' 4종</h2>
+    <div class="step"><b>지금은 20년 만의 최고 과열(천장권). 그럼 '언제 식나'를 미리 알려줄 신호는 뭘까요?</b><br>
+      옛날 광부가 갱도에 <b>카나리아(새)</b>를 데려가 위험을 먼저 감지했듯, <b>꼭대기가 가까워지면 먼저 깜빡일 4가지</b>를 모았습니다.
+      ①은 수출 데이터로 <b>매주 자동</b> 계산하고, ②③④는 사람이 분기마다 확인하는 정성 지표입니다.
+      <span class="muted">🟢 아직 안전 · 🟡 주의(첫 징후) · 🔴 경고(전환).</span></div>
+    {card}
+    {manual}
+    <div class="warn"><b>지금 종합:</b> {summ}
+      ②(빅테크 투자)와 ④(재고)는 다음 실적시즌(7~8월)이 분수령입니다.</div>"""
+
+
 def main() -> None:
     df = load()
     with open(os.path.join(HERE, "signal_config.yaml"), encoding="utf-8") as f:
@@ -442,6 +557,9 @@ def main() -> None:
       짧게(1~3개월)는 수출과 주가가 같이 가고, 길게(12개월)는 거꾸로 — <b>수출이 폭락한 바닥에서 산 게 1년 뒤 가장 크게 올랐습니다</b>(3번 표).
       이 도구가 '며칠에 사라'는 정밀 시계가 아니라 <b>지금이 바닥권이냐 천장권이냐를 재는 체온계</b>인 이유입니다.</div>"""
 
+    # 6번 섹션 — 사이클 천장 카나리아(①자동 + ②③④수동)
+    canary_section = canary_section_html(df, load_canary_watch())
+
     today = dt.date.today().isoformat()
     style = """
     <style>
@@ -479,6 +597,16 @@ def main() -> None:
       .big{font-size:1.1rem}
       .mbar{height:6px;background:#eef0f2;border-radius:3px;margin-top:5px;overflow:hidden;min-width:54px}
       .mbar span{display:block;height:100%;background:#0071e3;border-radius:3px}
+      /* 6번 — 천장 카나리아 카드(자동 ①) */
+      .canary{border:2px solid #ff9500;border-radius:14px;margin:1em 0;overflow:hidden;background:#fff}
+      .cbadge{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;justify-content:space-between;
+              color:#fff;font-weight:700;font-size:.92rem;padding:9px 16px}
+      .cauto{font-weight:500;font-size:.72rem;background:rgba(255,255,255,.28);
+             padding:2px 9px;border-radius:999px;white-space:nowrap}
+      .chead{font-size:1.12rem;font-weight:700;padding:13px 16px 2px;line-height:1.4}
+      .cnums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 16px 16px;text-align:center}
+      .cnums b{font-size:1.05rem;color:#1d1d1f}
+      @media(max-width:480px){.cnums{grid-template-columns:repeat(2,1fr);gap:12px}}
       /* 인터랙티브 차트(반응형) — 화면 폭에 맞게 또렷하게, 손가락으로 값 확인 */
       .charthint{color:#8e8e93;font-size:.82rem;margin:.4em 0 .1em}
       .chartbox{position:relative;height:330px;margin:.6em 0;border:1px solid #e5e5ea;
@@ -577,7 +705,8 @@ def main() -> None:
     <p class="big">아래 칸(수출 증가율)이 <b>바닥을 칠 때마다</b> 위 칸(주가)도 바닥이었고, <b>치솟을 때</b> 주가도 천장이었습니다.
     그리고 <b>맨 오른쪽 = 지금</b> — 수출 증가율이 20년 중 가장 높이 치솟아 있습니다(과열).</p>
     {leadlag_section}
-    <h2>6. 꼭 기억할 점</h2>
+    {canary_section}
+    <h2>7. 꼭 기억할 점</h2>
     <div class="warn">
       · 이건 <b>'사이클 체온계'</b>입니다 — "지금 뜨겁다/차갑다"는 알려주지만 <b>'며칠에 사라'까지는 못 맞힙니다.</b><br>
       · <b>지금은 20년 만의 최고 과열</b>이라 역사 기준으론 '파는 자리'. 단 <b>AI/HBM 때문에 사상 처음 보는 영역</b>이라
