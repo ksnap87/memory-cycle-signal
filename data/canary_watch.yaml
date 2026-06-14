@@ -3,7 +3,7 @@
 # 아래 3개는 어닝콜·업계뉴스·분기보고서 기반 → '예약된 작업(Claude)'이 매주 웹에서 자동 조사·갱신한다.
 #   (수동으로 고칠 때는 updated 날짜와 각 status/note 만 바꾸면 됨.)
 # status: up = 🟢 아직 안전 / flat = 🟡 주의(첫 징후) / down = 🔴 경고(전환)
-updated: 2026-06-07
+updated: 2026-06-14
 auto: 매주 웹 조사(예약작업)로 갱신
 items:
   - name: 하이퍼스케일러 투자(capex) 가이던스
@@ -11,21 +11,21 @@ items:
     trigger: 빅4 중 다수가 다음 분기 capex를 '동결·축소'로 가이드하거나 "AI 투자 속도조절" 발언.
     where: 각사 분기 실적발표(어닝콜)
     status: up
-    note: "Q1'26 어닝콜 재확인: 빅4 합산 2026 capex $725B(YoY +77%) 전원 유지 — 아마존 $200B·MS $190B·구글 $190B·메타 $125~145B(상향); 메타는 AI 컴포넌트 비용 상승 반영해 가이던스 추가 상향. Q2'26 기준 감속·동결 신호 없음(Yahoo Finance, Silicon Republic, 2026-05)."
+    note: "Q1'26 어닝콜 확정: 빅4 합산 2026 capex $725B(YoY +77%) 전원 유지·상향 — MS $190B·구글 $190B·아마존 $200B·메타 $125~145B(AI 컴포넌트 비용 반영해 재상향); MS는 메모리 비용 상승분 $25B 별도 추산해 투자 의지 재확인. Q2'26 기준 감속·동결 신호 없음(Fortune, Yahoo Finance, Tom's Hardware, 2026-04)."
     next_check: 2026-07~08 (2분기 실적)
   - name: HBM4 양산 + 범용 D램 증설 (공급)
     why: 지금 수출 급증의 핵심은 '단가 폭등'. 공급(HBM4 양산·신규 팹)이 늘면 단가가 꺾인다.
     trigger: HBM4 대량양산 + 범용 D램 증설이 겹쳐 '공급과잉' 신호가 나올 때.
     where: 트렌드포스 등 업계 뉴스 · 3사 증설/capex 발표
     status: up
-    note: "삼성·SK하이닉스·마이크론 HBM4 2월 양산 돌입, 2026년치 전량 선판매 완료 — HBM이 글로벌 D램 웨이퍼의 23% 소화(2025년 19%→2026년 23%)로 범용 D램 공급 타이트 심화; TrendForce 2Q'26 D램 계약가 +63% 전망, 신규 팹 2027년 이전 없어 공급과잉 가능성 낮음(TrendForce 2026-03·2026-05, BuySellRam)."
+    note: "삼성 2026년 2월 HBM4 양산 공식 돌입(1c 10나노, 11.7Gbps), HBM이 D램 웨이퍼의 23% 소화로 범용 DDR5 공급 추가 타이트; TrendForce 2Q'26 D램 계약가 +58~63%(1Q'26 +90~95% 에 이어) 전망, CSP는 장기계약으로 물량 선점 — 신규 팹 2027년 하반기 이전 없어 공급과잉 신호 부재(TrendForce 2026-03·2026-06, Tom's Hardware)."
     next_check: 분기별
   - name: 재고 — 고객 '쌓기→빼기' 전환
     why: 고객(데이터센터·세트업체)이 재고를 쌓다가 빼기 시작하면 주문이 급감 → 사이클 하강.
     trigger: 삼성·하이닉스 재고자산/재고일수(DIO) 반등, 또는 고객사 '재고 조정' 언급.
     where: 삼성·하이닉스 분기보고서(DART) · 어닝콜
     status: up
-    note: "글로벌 D램 재고 2~3주로 역대 최저 수준 유지, 낸드 3~4주; SK하이닉스 Q1'26 HBM·D램·낸드 용량 '사실상 전량 판매 완료' 발표(WCCFTech 2026-05). Q2부터 소비자가전(모바일·PC)도 재고 재축적 진입 — 고객 재고 조정('디스토킹') 징후 없음(TrendForce, Tom's Hardware)."
+    note: "글로벌 D램 재고 2~3주 역대 최저 유지, SK하이닉스 2026년분 HBM·D램·낸드 전량 판매 완료 재확인; 삼성 메모리 총괄 '2027년 이후까지 공급 부족 지속' 공식 경고 — 고객 재고 조정('디스토킹') 징후 없고 오히려 조기 확보 경쟁 심화(Tom's Hardware, WCCFTech, Korea Herald, 2026-05~06)."
     next_check: 2026-07~08 (2분기 실적)
-# 출처(2026-06-07 조사): Yahoo Finance, Silicon Republic, Tom's Hardware, CreditSights,
-#   TrendForce, WCCFTech, BuySellRam — 빅4 capex $725B 유지 / HBM4 전량매진·D램 웨이퍼 23% 소화 / 글로벌 D램 재고 2~3주 역대 최저.
+# 출처(2026-06-14 조사): Yahoo Finance, Fortune, Tom's Hardware, Fast Company,
+#   TrendForce, WCCFTech, Korea Herald, Network World — 빅4 capex $725B 재확인·추가상향 / HBM4 2월 양산·D램 웨이퍼 23% 소화 / 글로벌 D램 재고 2~3주 역대 최저·삼성 '2027↑ 공급부족' 경고.
