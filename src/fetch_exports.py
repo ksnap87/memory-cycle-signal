@@ -13,6 +13,7 @@ import os
 import sys
 import argparse
 import xml.etree.ElementTree as ET
+from urllib.parse import unquote
 import requests
 import pandas as pd
 
@@ -27,16 +28,20 @@ START_YYMM = "200601"
 
 def load_key() -> str:
     key = os.environ.get("CUSTOMS_API_KEY")
-    if key:
-        return key
-    sp = os.path.join(HERE, "secrets.local.yaml")
-    if os.path.exists(sp):
-        import yaml
-        with open(sp, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-        if data.get("customs_api_key"):
-            return data["customs_api_key"]
-    sys.exit("키 없음. 환경변수 CUSTOMS_API_KEY 설정 또는 secrets.local.yaml 에 customs_api_key 작성")
+    if not key:
+        sp = os.path.join(HERE, "secrets.local.yaml")
+        if os.path.exists(sp):
+            import yaml
+            with open(sp, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            key = data.get("customs_api_key")
+    if not key:
+        sys.exit("키 없음. 환경변수 CUSTOMS_API_KEY 설정 또는 secrets.local.yaml 에 customs_api_key 작성")
+    # data.go.kr 은 같은 키를 'Encoding'(%2B·%2F 등 이미 퍼센트인코딩됨)과
+    # 'Decoding'(+·/ 등 원문) 두 형태로 제공한다. requests 는 params 를 다시 인코딩하므로
+    # Encoding 키를 그대로 넣으면 '%2B'→'%252B' 이중 인코딩되어 403(권한없음)이 난다.
+    # unquote 로 항상 Decoding 형태로 통일 → requests 가 정확히 한 번만 인코딩하게 한다.
+    return unquote(key.strip())
 
 
 def call(key: str, strt: str, end: str, hs: str = HS_SEMICONDUCTOR) -> requests.Response:
@@ -111,7 +116,11 @@ def main() -> None:
         strt = f"{yr}01"
         last = f"{yr}{end.month:02d}" if yr == end.year else f"{yr}12"
         r = call(key, strt, last, args.hs)
-        r.raise_for_status()
+        if r.status_code != 200:
+            # data.go.kr 은 사유를 본문에 담아 준다(예: SERVICE_KEY_IS_NOT_REGISTERED_ERROR,
+            # 등록되지 않은 서비스키, 활용중지 등) → 상태코드만 보지 말고 본문을 그대로 노출.
+            body = r.text.strip().replace("\n", " ")[:300]
+            raise RuntimeError(f"HTTP {r.status_code} — 관세청 응답: {body}")
         part = parse_month_sums(r.text)
         rows.update(part)
         print(f"  {yr}: {len(part)}개월 수집")
