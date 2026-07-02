@@ -11,13 +11,14 @@ import sys
 
 import fetch_data
 import fetch_exports
+import fetch_flows
 
 
 def main() -> None:
-    print("[1/2] 주가·SOX·마이크론·환율 갱신 (yfinance) …")
+    print("[1/3] 주가·SOX·마이크론·환율 갱신 (yfinance) …")
     fetch_data.main()
 
-    print("\n[2/2] 반도체·메모리 수출 갱신 (관세청) …")
+    print("\n[2/3] 반도체·메모리 수출 갱신 (관세청) …")
     try:
         fetch_exports.main()
     except SystemExit as e:
@@ -25,6 +26,14 @@ def main() -> None:
         print(f"  ⚠ 수출 데이터 건너뜀(키 없음/오류): {e}\n    → 기존 exports CSV를 그대로 사용합니다.")
     except Exception as e:  # 네트워크/파싱 오류도 비치명적으로 처리
         print(f"  ⚠ 수출 데이터 갱신 실패: {e}\n    → 기존 exports CSV를 그대로 사용합니다.")
+
+    print("\n[3/3] 투자자 수급(외국인·기관 순매수) 갱신 (KRX) …")
+    try:
+        fetch_flows.main()
+    except SystemExit as e:
+        print(f"  ⚠ 수급 데이터 건너뜀: {e}\n    → 기존 flows CSV를 그대로 사용합니다.")
+    except Exception as e:  # KRX 응답/네트워크 오류도 비치명적으로 처리
+        print(f"  ⚠ 수급 데이터 갱신 실패: {e}\n    → 기존 flows CSV를 그대로 사용합니다.")
 
     print("\n갱신 완료. 다음: python3 src/compute_signals.py → python3 src/build_dashboard.py")
 
