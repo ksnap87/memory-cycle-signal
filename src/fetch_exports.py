@@ -65,11 +65,20 @@ def probe(key: str, yymm: str) -> None:
 FIELDS = ("total_8542", "memory_854232", "dram", "nand",
           "wgt_8542", "wgt_854232", "wgt_dram", "wgt_nand")
 
+# getNitemtradeList 는 '조회한 hsSgn 단위' 실적만 돌려준다(하위코드로 자동 분해해 주지 않음).
+# 따라서 반도체·메모리·디램·낸드를 각각 따로 호출해 채워야 한다.
+# (금액필드, 중량필드, 조회할 HS코드)
+HS_TARGETS = (
+    ("total_8542",    "wgt_8542",   "8542"),        # 반도체(전자집적회로) 전체
+    ("memory_854232", "wgt_854232", "854232"),      # 메모리(D램·플래시 등)
+    ("dram",          "wgt_dram",   "8542321010"),  # 디램(DRAM)
+    ("nand",          "wgt_nand",   "8542321030"),  # 낸드(플래시 메모리)
+)
 
-def parse_month_sums(xml_text: str) -> dict:
-    """응답 XML → {YYYY-MM: {금액·중량 합계}}. '총계' 행은 제외.
-    금액=expDlr(USD), 중량=expWgt(kg). 디램=8542321010, 낸드(플래시)=8542321030.
-    → 평균단가($/kg)=금액/중량 으로 '물량 vs 가격'을 분해할 수 있게 중량도 같이 수집."""
+
+def sum_months(xml_text: str) -> dict:
+    """단일 hsSgn 조회 응답 XML → {YYYY-MM: (금액USD합, 중량kg합)}. '총계' 행은 제외.
+    금액=expDlr(USD), 중량=expWgt(kg). 중량도 같이 모아 평균단가($/kg)=금액/중량 분해에 쓴다."""
     root = ET.fromstring(xml_text)
     code = root.findtext(".//resultCode")
     if code not in (None, "00"):
@@ -79,29 +88,17 @@ def parse_month_sums(xml_text: str) -> dict:
         ym = (it.findtext("year") or "").strip()
         if "." not in ym:            # '총계' 같은 합계행 제외
             continue
-        hs = (it.findtext("hsCode") or "").strip()
         exp = float(it.findtext("expDlr") or 0)
         wgt = float(it.findtext("expWgt") or 0)
         key = ym.replace(".", "-")   # "2025.04" -> "2025-04"
-        rec = out.setdefault(key, {f: 0.0 for f in FIELDS})
-        rec["total_8542"] += exp
-        rec["wgt_8542"] += wgt
-        if hs.startswith("854232"):
-            rec["memory_854232"] += exp
-            rec["wgt_854232"] += wgt
-        if hs == "8542321010":       # 디램(DRAM)
-            rec["dram"] += exp
-            rec["wgt_dram"] += wgt
-        elif hs == "8542321030":     # 낸드(플래시 메모리)
-            rec["nand"] += exp
-            rec["wgt_nand"] += wgt
+        e, w = out.get(key, (0.0, 0.0))
+        out[key] = (e + exp, w + wgt)
     return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", metavar="YYYYMM", help="한 달치 원본 응답 확인")
-    ap.add_argument("--hs", default=HS_SEMICONDUCTOR)
     args = ap.parse_args()
 
     key = load_key()
@@ -109,21 +106,27 @@ def main() -> None:
         probe(key, args.probe)
         return
 
-    # 전체기간 수집 — 연도별로 끊어 호출(응답 과대·캡 방지). 20여 콜 << 일 10,000.
+    # 전체기간 수집 — HS코드별 × 연도별로 끊어 호출(응답 과대·캡 방지).
+    # HS 4종 × 20여 연도 ≈ 80여 콜 << 일 10,000.
     end = pd.Timestamp.today()
     rows: dict = {}
-    for yr in range(int(START_YYMM[:4]), end.year + 1):
-        strt = f"{yr}01"
-        last = f"{yr}{end.month:02d}" if yr == end.year else f"{yr}12"
-        r = call(key, strt, last, args.hs)
-        if r.status_code != 200:
-            # data.go.kr 은 사유를 본문에 담아 준다(예: SERVICE_KEY_IS_NOT_REGISTERED_ERROR,
-            # 등록되지 않은 서비스키, 활용중지 등) → 상태코드만 보지 말고 본문을 그대로 노출.
-            body = r.text.strip().replace("\n", " ")[:300]
-            raise RuntimeError(f"HTTP {r.status_code} — 관세청 응답: {body}")
-        part = parse_month_sums(r.text)
-        rows.update(part)
-        print(f"  {yr}: {len(part)}개월 수집")
+    for val_f, wgt_f, hs in HS_TARGETS:
+        got = set()
+        for yr in range(int(START_YYMM[:4]), end.year + 1):
+            strt = f"{yr}01"
+            last = f"{yr}{end.month:02d}" if yr == end.year else f"{yr}12"
+            r = call(key, strt, last, hs)
+            if r.status_code != 200:
+                # data.go.kr 은 사유를 본문에 담아 준다(예: SERVICE_KEY_IS_NOT_REGISTERED_ERROR,
+                # 등록되지 않은 서비스키, 활용중지 등) → 상태코드만 보지 말고 본문을 그대로 노출.
+                body = r.text.strip().replace("\n", " ")[:300]
+                raise RuntimeError(f"HTTP {r.status_code} — 관세청 응답: {body}")
+            for month, (e, w) in sum_months(r.text).items():
+                rec = rows.setdefault(month, {f: 0.0 for f in FIELDS})
+                rec[val_f] += e
+                rec[wgt_f] += w
+                got.add(month)
+        print(f"  HS {hs}: {len(got)}개월 수집")
 
     df = pd.DataFrame(rows).T.sort_index()
     df.index = pd.to_datetime(df.index) + pd.offsets.MonthEnd(0)  # 월말로 정렬

@@ -157,6 +157,8 @@ def both_q15(df: pd.DataFrame) -> dict:
     out = {}
     for lab, ser in sigs.items():
         bt = quintile_backtest(dw, ser, lab)
+        if bt.empty:                     # 표본부족 등으로 백테스트가 비면 이 시그널은 건너뜀
+            continue                     # (없는 '타깃' 컬럼 접근으로 파이프라인이 죽지 않게)
         per = {}
         for tgt in ("삼성전자", "SK하이닉스"):
             t = bt[bt["타깃"] == tgt].sort_values("q")
