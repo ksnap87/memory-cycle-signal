@@ -55,7 +55,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html data/processed/panel_monthly.csv data/history/ data/raw/exports_semiconductor.csv
+          git add docs/index.html data/processed/panel_monthly.csv data/history/ data/raw/exports_semiconductor.csv data/raw/flows_investor.csv
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 건너뜀"
           else
