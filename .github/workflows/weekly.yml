@@ -1,15 +1,17 @@
-name: weekly-dashboard
+name: monthly-dashboard
 
 on:
   schedule:
-    - cron: '0 23 * * 0'   # 일요일 23:00 UTC = 월요일 08:00 KST
+    # 매달 20일 23:17 UTC = 21일 08:17 KST. 관세청 수출은 1개월 시차라
+    # 매달 중하순이면 직전 달 확정치까지 잡혀 가장 알차다.
+    - cron: '17 23 20 * *'
   workflow_dispatch: {}     # 수동 실행 버튼
 
 permissions:
   contents: write           # docs/ 갱신분을 main 에 push
 
 concurrency:
-  group: weekly-dashboard
+  group: monthly-dashboard
   cancel-in-progress: false
 
 jobs:
@@ -59,6 +61,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 건너뜀"
           else
-            git commit -m "주간 갱신: $(date -u +%Y-%m-%d)"
+            git commit -m "월간 갱신: $(date -u +%Y-%m-%d)"
             git push
           fi
