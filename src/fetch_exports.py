@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(HERE, "data", "raw")
 os.makedirs(RAW, exist_ok=True)
 
-ENDPOINT = "https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList"
+ENDPOINT = "https://apis.data.go.kr/1220000/nitemtrade/getNitemtradeList"
 HS_SEMICONDUCTOR = "8542"   # 전자집적회로(반도체 핵심). 메모리만 보려면 854232
 START_YYMM = "200601"
 
