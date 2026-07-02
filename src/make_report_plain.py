@@ -157,6 +157,8 @@ def both_q15(df: pd.DataFrame) -> dict:
     out = {}
     for lab, ser in sigs.items():
         bt = quintile_backtest(dw, ser, lab)
+        if bt.empty:                     # 표본부족 등으로 백테스트가 비면 이 시그널은 건너뜀
+            continue                     # (없는 '타깃' 컬럼 접근으로 파이프라인이 죽지 않게)
         per = {}
         for tgt in ("삼성전자", "SK하이닉스"):
             t = bt[bt["타깃"] == tgt].sort_values("q")
@@ -427,6 +429,7 @@ def main() -> None:
     semi = _exp("반도체수출_8542_백만$", "반도체수출_8542_톤")
     mem = _exp("메모리수출_854232_백만$", "메모리수출_854232_톤")
     dram = _exp("디램수출_백만$", "디램수출_톤")
+    nand = _exp("낸드수출_백만$", "낸드수출_톤")
 
     # 종합 신호등 점수: 매수권 +가중치 / 매도권 -가중치
     score = 0.0
@@ -672,6 +675,9 @@ def main() -> None:
     작년 같은 달보다 <b>+{semi['yoy']:.0f}%</b>. 메모리 수출 <b>{mem['eok']:.0f}억 달러</b>{'(사상 최고치)' if mem['is_high'] else ''},
     작년比 <b>+{mem['yoy']:.0f}%</b>. 다만 <b>최근 1~2달은 더 안 오르고 옆걸음(횡보)</b> 중입니다
     (메모리 전달比 {mem['mom']:+.1f}%) — 사상 최고 수준이긴 해도 <b>상승 속도는 한풀 꺾였습니다.</b></p>
+    <p class="big">그중 종류별로 나눠 보면 — <b style="color:#34c759">디램 {dram['eok']:.0f}억 달러</b>(작년比 +{dram['yoy']:.0f}%),
+    <b style="color:#ff9500">낸드 {nand['eok']:.0f}억 달러</b>(작년比 +{nand['yoy']:.0f}%). 위 그래프의 네 선이 각각
+    <b>반도체 전체 · 메모리 합계 · 디램 · 낸드</b>입니다. <span class="muted">※ HBM은 관세청 코드상 디램(8542321010)에 포함돼 따로는 안 잡힙니다.</span></p>
 
     <div class="step"><b>"수출이 늘었다" — 물량이 늘었나, 비싸게 판 건가?</b><br>
       수출 금액은 <b>물량(몇 톤 팔았나) × 단가(kg당 얼마)</b>로 쪼갤 수 있습니다.
