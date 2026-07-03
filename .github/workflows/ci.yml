@@ -36,3 +36,8 @@ jobs:
         run: |
           python3 src/compute_signals.py
           python3 src/make_report_plain.py
+
+      - name: 수급 소스 연결 확인 (네이버 · 비치명적)
+        # KRX 는 해외 CI IP 에서 빈 응답 → 네이버로 교체. 실제 CI 에서 되는지 프로브만.
+        # 실패해도 CI 를 깨지 않는다(|| true) — 연결/파싱 여부를 로그로만 남긴다.
+        run: python3 src/fetch_flows.py --probe || true

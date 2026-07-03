@@ -209,7 +209,7 @@ def _flows_block() -> str:
         return (
             '<h2>수급 — 외국인·기관 순매수 <span class="muted">(참고 · 억원)</span></h2>'
             '<p class="charthint">＋ = 순매수(빨강) · － = 순매도(파랑) · 최근 6개월 · '
-            'KRX 투자자별 순매수(거래대금) 기준.</p>'
+            '네이버 금융 · 순매매량×종가 추정 순매수.</p>'
             '<div class="tblwrap"><table class="rt"><thead><tr><th>월</th>'
             + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
             f'<p class="big">최근 3개월 누적({month} 기준) — ' + " · ".join(bits) + f'. → {verdict}.</p>'
