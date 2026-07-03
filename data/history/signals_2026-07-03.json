@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-03 15:23",
+  "updated_at": "2026-07-03 23:18",
   "price_through": "2026-07",
   "export_through": "2026-05",
   "composite": {
@@ -127,7 +127,7 @@
       "stars": "★",
       "trust": "약달러원=수출 우호 · 거드는 정도",
       "direction": "high_is_buy",
-      "yoy": 10.0,
+      "yoy": 9.9,
       "percentile": 89.0,
       "q": 1,
       "zone": "매수권",
@@ -161,7 +161,7 @@
         3.9,
         9.1,
         13.1,
-        10.0
+        9.9
       ],
       "bt_q": [
         7.7,
