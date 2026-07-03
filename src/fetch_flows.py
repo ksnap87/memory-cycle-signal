@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(HERE, "data", "raw")
 os.makedirs(RAW, exist_ok=True)
 
-START_YYMMDD = "20100101"
+START_YYMMDD = "20160101"   # 최근 10년(표시·백테스트 충분) — 과대범위 빈응답 방지
 
 # (종목명, 티커) — 패널 타깃과 동일
 TICKERS = [("삼성전자", "005930"), ("SK하이닉스", "000660")]
@@ -36,15 +36,29 @@ def _pick(df: pd.DataFrame, *names: str) -> pd.Series:
 
 
 def fetch_one(ticker: str, start: str, end: str) -> pd.DataFrame:
-    """한 종목의 월별 외국인·기관 순매수(억원). index=월말."""
+    """한 종목의 월별 외국인·기관 순매수(억원). index=월말.
+    KRX 는 조회 범위가 크면 빈 응답을 주므로 수출 수집과 동일하게 '연도별'로 끊어 호출한다.
+    일부 연도가 비어도(상장 전 등) 건너뛰고 나머지를 이어붙인다."""
     from pykrx import stock
-    raw = stock.get_market_trading_value_by_date(start, end, ticker, on="순매수", freq="m")
-    if raw is None or raw.empty:
+    y0, y1 = int(start[:4]), int(end[:4])
+    frames = []
+    for yr in range(y0, y1 + 1):
+        s = start if yr == y0 else f"{yr}0101"
+        e = end if yr == y1 else f"{yr}1231"
+        try:
+            raw = stock.get_market_trading_value_by_date(s, e, ticker, on="순매수", freq="m")
+        except Exception:
+            continue                       # 특정 연도 조회 오류는 건너뛰고 계속
+        if raw is not None and not raw.empty:
+            frames.append(raw)
+    if not frames:
         return pd.DataFrame()
+    raw = pd.concat(frames)
     foreign = _pick(raw, "외국인합계", "외국인")
     inst = _pick(raw, "기관합계", "기관")
     out = pd.DataFrame({"외국인_억": foreign / 1e8, "기관_억": inst / 1e8})
     out.index = pd.to_datetime(out.index) + pd.offsets.MonthEnd(0)   # 월말 정렬(패널과 동일)
+    out = out[~out.index.duplicated(keep="last")].sort_index()
     out.index.name = "date"
     return out
 
