@@ -7,9 +7,10 @@ secrets.local.yaml
 .claude/
 reports/
 
-# 원본 데이터: raw 는 기본 제외하되, 공개 관세청 수출 데이터는 CI용으로 포함
+# 원본 데이터: raw 는 기본 제외하되, 공개 관세청 수출·투자자 수급 데이터는 CI용으로 포함
 data/raw/*
 !data/raw/exports_semiconductor.csv
+!data/raw/flows_investor.csv
 
 # 대시보드 원자료(JSON)는 게시하지 않음 — 암호화된 index.html 만 공개
 docs/signals.json

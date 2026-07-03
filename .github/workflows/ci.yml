@@ -1,0 +1,38 @@
+name: ci
+
+# PR·브랜치 푸시마다 자동 검증. 데이터 수집(fetch)·게시(commit/push)는 하지 않는
+# '가벼운 스모크'라 시크릿·외부망이 필요 없다. 커밋된 데이터로 신호계산+리포트
+# 생성이 끝까지 도는지만 본다 → 리포트 크래시(예: KeyError) 를 머지 전에 잡는다.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main        # main 은 weekly.yml(게시) 담당 → 중복 방지
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 패키지 설치
+        run: pip install -r requirements-ci.txt
+
+      - name: 문법 검사 (전체 src)
+        run: python3 -m py_compile src/*.py
+
+      - name: 파이프라인 스모크 (커밋된 데이터로 신호계산 + 리포트 생성)
+        run: |
+          python3 src/compute_signals.py
+          python3 src/make_report_plain.py
