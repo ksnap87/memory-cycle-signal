@@ -1,97 +1,134 @@
 """
-투자자별 수급(순매수) 수집 — 삼성전자·SK하이닉스의 외국인·기관 월별 순매수(원) → 억원.
+투자자 수급(순매수) 수집 — 네이버 금융에서 삼성전자·SK하이닉스의 외국인·기관
+'순매매량'(주)을 긁어 월별 '추정 순매수 금액(억원, 순매매량×종가)'으로 집계.
 
-출처: KRX(pykrx). 로그인 불필요(공개 데이터). import 시 나오는 'KRX 로그인 실패' 경고는
-프리미엄 기능용이라 이 조회에는 영향 없음.
+왜 네이버인가: KRX/pykrx 는 해외(깃허브 액션) IP 에서 빈 응답을 준다(검증됨).
+네이버 금융 HTML 은 전역 접근이 되므로 CI 에서 동작할 가능성이 높다.
 
-핵심 함수:
-  stock.get_market_trading_value_by_date(fromdate, todate, ticker, on='순매수', freq='m')
-    → 컬럼: 기관합계 · 기타법인 · 개인 · 외국인합계 · 전체  (순매수 '거래대금', 단위 원)
+출처: https://finance.naver.com/item/frgn.naver?code={code}&page={n}
+  표 헤더(2단): 날짜 · 종가 · 전일비 · 등락률 · 거래량 · 기관[순매매량] · 외국인[순매매량] · 외국인[보유주수] · 외국인[보유율]
 
 사용:
-  python3 src/fetch_flows.py            # 전체기간 수집 → data/raw/flows_investor.csv
-  python3 src/fetch_flows.py --probe    # 최근 몇 달 원본 확인
+  python3 src/fetch_flows.py            # 수집 → data/raw/flows_investor.csv
+  python3 src/fetch_flows.py --probe    # 최근 표 몇 줄만 확인
 """
 import os
 import sys
+import io
+import time
 import argparse
 import pandas as pd
+import requests
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(HERE, "data", "raw")
 os.makedirs(RAW, exist_ok=True)
 
-START_YYMMDD = "20160101"   # 최근 10년(표시·백테스트 충분) — 과대범위 빈응답 방지
-
-# (종목명, 티커) — 패널 타깃과 동일
 TICKERS = [("삼성전자", "005930"), ("SK하이닉스", "000660")]
+PAGES = 18                       # 1페이지≈10거래일 → ~18페이지≈9개월+ (월별 집계엔 충분)
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Referer": "https://finance.naver.com/",
+}
 
 
-def _pick(df: pd.DataFrame, *names: str) -> pd.Series:
-    """여러 후보 컬럼명 중 실제 존재하는 것을 골라 반환(KRX 컬럼명 변형 방어)."""
-    for n in names:
-        if n in df.columns:
-            return df[n]
-    raise KeyError(f"기대 컬럼 없음 {names} — 실제 {list(df.columns)}")
+def _flatten(col) -> str:
+    return "".join(str(x) for x in col) if isinstance(col, tuple) else str(col)
 
 
-def fetch_one(ticker: str, start: str, end: str) -> pd.DataFrame:
-    """한 종목의 월별 외국인·기관 순매수(억원). index=월말.
-    KRX 는 조회 범위가 크면 빈 응답을 주므로 수출 수집과 동일하게 '연도별'로 끊어 호출한다.
-    일부 연도가 비어도(상장 전 등) 건너뛰고 나머지를 이어붙인다."""
-    from pykrx import stock
-    y0, y1 = int(start[:4]), int(end[:4])
+def parse_frgn_table(html: str) -> pd.DataFrame:
+    """네이버 frgn 페이지 HTML → [날짜, 종가, 기관순매매량, 외국인순매매량] (숫자화, 결측행 제거).
+    표 구조가 조금 달라도 '순매매량' 컬럼을 가진 표를 찾아 컬럼명 부분일치로 뽑는다."""
+    tables = pd.read_html(io.StringIO(html))
+    target = None
+    for t in tables:
+        flat = [_flatten(c) for c in t.columns]
+        if any("순매매량" in f for f in flat) and any("날짜" in f for f in flat):
+            target = t
+            break
+    if target is None:
+        return pd.DataFrame()
+
+    flat = {_flatten(c): c for c in target.columns}
+
+    def pick(*keys):
+        for want in keys:
+            for f, c in flat.items():
+                if all(k in f for k in want):
+                    return target[c]
+        return None
+
+    date = pick(("날짜",))
+    close = pick(("종가",))
+    inst = pick(("기관", "순매매량"))
+    frgn = pick(("외국인", "순매매량"))
+    if any(x is None for x in (date, close, inst, frgn)):
+        return pd.DataFrame()
+
+    out = pd.DataFrame({"날짜": date, "종가": close, "기관주": inst, "외국인주": frgn})
+    out = out.dropna(subset=["날짜"])
+    for c in ("종가", "기관주", "외국인주"):
+        out[c] = pd.to_numeric(
+            out[c].astype(str).str.replace(",", "", regex=False).str.replace("+", "", regex=False),
+            errors="coerce")
+    out["날짜"] = pd.to_datetime(out["날짜"], format="%Y.%m.%d", errors="coerce")
+    return out.dropna(subset=["날짜", "종가"])
+
+
+def fetch_one(code: str, pages: int = PAGES) -> pd.DataFrame:
+    """한 종목 → 월별 {외국인_억, 기관_억}. 순매매량(주)×종가 → 원 → 억원."""
     frames = []
-    for yr in range(y0, y1 + 1):
-        s = start if yr == y0 else f"{yr}0101"
-        e = end if yr == y1 else f"{yr}1231"
+    for p in range(1, pages + 1):
+        url = f"https://finance.naver.com/item/frgn.naver?code={code}&page={p}"
         try:
-            raw = stock.get_market_trading_value_by_date(s, e, ticker, on="순매수", freq="m")
+            r = requests.get(url, headers=HEADERS, timeout=15)
+            r.encoding = "euc-kr"
+            part = parse_frgn_table(r.text)
         except Exception:
-            continue                       # 특정 연도 조회 오류는 건너뛰고 계속
-        if raw is not None and not raw.empty:
-            frames.append(raw)
+            continue
+        if not part.empty:
+            frames.append(part)
+        time.sleep(0.3)                 # 네이버 예의상 딜레이(연속 36요청 차단 방지)
     if not frames:
         return pd.DataFrame()
-    raw = pd.concat(frames)
-    foreign = _pick(raw, "외국인합계", "외국인")
-    inst = _pick(raw, "기관합계", "기관")
-    out = pd.DataFrame({"외국인_억": foreign / 1e8, "기관_억": inst / 1e8})
-    out.index = pd.to_datetime(out.index) + pd.offsets.MonthEnd(0)   # 월말 정렬(패널과 동일)
-    out = out[~out.index.duplicated(keep="last")].sort_index()
-    out.index.name = "date"
-    return out
+
+    d = pd.concat(frames).drop_duplicates("날짜").set_index("날짜").sort_index()
+    # 일별 추정 순매수 금액(원) = 순매매량(주) × 종가(원)
+    val = pd.DataFrame({
+        "외국인_억": d["외국인주"] * d["종가"] / 1e8,
+        "기관_억": d["기관주"] * d["종가"] / 1e8,
+    })
+    m = val.resample("ME").sum()          # 월별 합계(월말 인덱스 = 패널과 동일)
+    m.index.name = "date"
+    return m
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--probe", action="store_true", help="최근 6개월만 찍어보기")
+    ap.add_argument("--probe", action="store_true", help="첫 종목 최근 표 몇 줄 확인")
     args = ap.parse_args()
 
-    end = pd.Timestamp.today().strftime("%Y%m%d")
-    start = START_YYMMDD
     if args.probe:
-        start = (pd.Timestamp.today() - pd.DateOffset(months=6)).strftime("%Y%m%d")
-
-    frames = []
-    for name, tk in TICKERS:
-        df = fetch_one(tk, start, end)
-        if df.empty:
-            print(f"  ⚠ {name}({tk}): 빈 응답")
-            continue
-        df = df.rename(columns={c: f"{name}_{c}" for c in df.columns})
-        frames.append(df)
-        print(f"  {name}({tk}): {len(df)}개월")
-
-    if not frames:
-        sys.exit("수급 데이터 없음 — KRX 응답 비어있음")
-
-    out = pd.concat(frames, axis=1).sort_index()
-
-    if args.probe:
-        print(out.tail(6).round(0).to_string())
+        r = requests.get(f"https://finance.naver.com/item/frgn.naver?code={TICKERS[0][1]}&page=1",
+                         headers=HEADERS, timeout=15)
+        r.encoding = "euc-kr"
+        print(parse_frgn_table(r.text).head(8).to_string())
         return
 
+    frames = []
+    for name, code in TICKERS:
+        m = fetch_one(code)
+        if m.empty:
+            print(f"  ⚠ {name}({code}): 빈 응답")
+            continue
+        frames.append(m.rename(columns={c: f"{name}_{c}" for c in m.columns}))
+        print(f"  {name}({code}): {len(m)}개월")
+
+    if not frames:
+        sys.exit("수급 데이터 없음 — 네이버 응답 비어있음")
+
+    out = pd.concat(frames, axis=1).sort_index()
     out_path = os.path.join(RAW, "flows_investor.csv")
     out.to_csv(out_path, encoding="utf-8-sig")
     print(f"\n저장: {out_path}")
