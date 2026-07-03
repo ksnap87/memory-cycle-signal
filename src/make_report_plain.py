@@ -172,6 +172,52 @@ def both_q15(df: pd.DataFrame) -> dict:
     return out
 
 
+def _flows_block() -> str:
+    """수급 카드(외국인·기관 순매수, 억원) HTML. 데이터가 없거나 어떤 오류든 나면
+    빈 문자열을 반환한다 — 부가 표시라 리포트 생성 전체를 절대 막지 않게(파이프라인 보호)."""
+    try:
+        path = os.path.join(HERE, "data", "raw", "flows_investor.csv")
+        if not os.path.exists(path):
+            return ""
+        fdf = pd.read_csv(path, parse_dates=["date"], index_col="date")
+        if fdf.empty:
+            return ""
+        spec = [("삼성전자_외국인_억", "삼성 외국인"), ("삼성전자_기관_억", "삼성 기관"),
+                ("SK하이닉스_외국인_억", "하이닉스 외국인"), ("SK하이닉스_기관_억", "하이닉스 기관")]
+        spec = [(c, l) for c, l in spec if c in fdf.columns]
+        if not spec:
+            return ""
+
+        def cell(v):
+            if pd.isna(v):
+                return '<td class="muted">–</td>'
+            color = "#d70015" if v >= 0 else "#0071e3"   # +순매수 빨강 / −순매도 파랑(한국식)
+            return f'<td style="color:{color};font-weight:600">{v:+,.0f}</td>'
+
+        head = "".join(f"<th>{l}</th>" for _, l in spec)
+        rows = ""
+        for dt, r in fdf.tail(6).iterrows():
+            rows += f"<tr><td>{dt.strftime('%Y-%m')}</td>" + "".join(cell(r.get(c)) for c, _ in spec) + "</tr>"
+
+        last3 = fdf.tail(3)
+        bits = [f"{l} <b>{float(last3[c].sum()):+,.0f}억</b>({'순매도' if last3[c].sum() < 0 else '순매수'})"
+                for c, l in spec]
+        total3 = float(sum(last3[c].sum() for c, _ in spec))
+        verdict = ("외국인·기관 합산 <b>순매도 우위 → 수급 부담</b>" if total3 < 0
+                   else "외국인·기관 합산 <b>순매수 우위 → 수급 우호</b>")
+        month = fdf.index[-1].strftime("%Y-%m")
+        return (
+            '<h2>수급 — 외국인·기관 순매수 <span class="muted">(참고 · 억원)</span></h2>'
+            '<p class="charthint">＋ = 순매수(빨강) · － = 순매도(파랑) · 최근 6개월 · '
+            'KRX 투자자별 순매수(거래대금) 기준.</p>'
+            '<div class="tblwrap"><table class="rt"><thead><tr><th>월</th>'
+            + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+            f'<p class="big">최근 3개월 누적({month} 기준) — ' + " · ".join(bits) + f'. → {verdict}.</p>'
+        )
+    except Exception:
+        return ""
+
+
 def _bin_color(q: int) -> str:
     """분위 칸 색 — 낮을수록(쌀 때) 초록, 높을수록(비쌀 때) 빨강. (low_is_buy 지표 기준)"""
     if q <= 2:
@@ -402,6 +448,7 @@ def main() -> None:
     q_canvases = "".join(f'<div class="chartbox"><canvas id="cQ{i}"></canvas></div>'
                          for i in range(n_q))
     q15 = both_q15(df)
+    flows_block = _flows_block()   # 수급 카드(외국인·기관 순매수) — 데이터 없으면 ''
 
     # 3번 섹션 그림 x축과 '똑같은' 칸 경계(작년比 %) — 설명 문장에 그대로 주입(숫자 어긋남 방지)
     _dwe = windowed(df, CALIB_SINCE)
@@ -691,6 +738,8 @@ def main() -> None:
       · 이 숫자는 <b>금액(달러)</b> 기준 — 몇 '개/톤' 팔렸나(물량)가 아니라 얼마치 팔았나입니다.<br>
       · 종류는 <b>메모리 전체(D램+낸드 합산, 관세청 코드 854232)</b> — <b>HBM만 따로는 못 가립니다.</b><br>
       · 즉 지금 금액 급증의 본질은 <b>'물량 폭발'이 아니라 '단가 폭등'</b> — 가격이 꺾이면 금액도 빠르게 식을 수 있습니다.</div>
+
+    {flows_block}
 
     <h2>3. 어떻게 판단하나 (이 그림이 핵심)</h2>
     <div class="step">
