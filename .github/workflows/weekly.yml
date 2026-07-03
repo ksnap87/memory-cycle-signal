@@ -57,7 +57,9 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html data/processed/panel_monthly.csv data/history/ data/raw/exports_semiconductor.csv data/raw/flows_investor.csv
+          git add docs/index.html data/processed/panel_monthly.csv data/history/ data/raw/exports_semiconductor.csv
+          # 수급 CSV 는 KRX 수집 실패 시 없을 수 있음 → 있을 때만 add(없다고 커밋 단계 전체가 죽지 않게)
+          if [ -f data/raw/flows_investor.csv ]; then git add data/raw/flows_investor.csv; fi
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 건너뜀"
           else
