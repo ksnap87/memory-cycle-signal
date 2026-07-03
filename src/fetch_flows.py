@@ -15,6 +15,7 @@
 import os
 import sys
 import io
+import time
 import argparse
 import pandas as pd
 import requests
@@ -88,6 +89,7 @@ def fetch_one(code: str, pages: int = PAGES) -> pd.DataFrame:
             continue
         if not part.empty:
             frames.append(part)
+        time.sleep(0.3)                 # 네이버 예의상 딜레이(연속 36요청 차단 방지)
     if not frames:
         return pd.DataFrame()
 
