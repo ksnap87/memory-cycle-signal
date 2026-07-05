@@ -3,7 +3,7 @@
 # 아래 3개는 어닝콜·업계뉴스·분기보고서 기반 → '예약된 작업(Claude)'이 매주 웹에서 자동 조사·갱신한다.
 #   (수동으로 고칠 때는 updated 날짜와 각 status/note 만 바꾸면 됨.)
 # status: up = 🟢 아직 안전 / flat = 🟡 주의(첫 징후) / down = 🔴 경고(전환)
-updated: 2026-06-28
+updated: 2026-07-05
 auto: 매주 웹 조사(예약작업)로 갱신
 items:
   - name: 하이퍼스케일러 투자(capex) 가이던스
@@ -11,22 +11,22 @@ items:
     trigger: 빅4 중 다수가 다음 분기 capex를 '동결·축소'로 가이드하거나 "AI 투자 속도조절" 발언.
     where: 각사 분기 실적발표(어닝콜)
     status: up
-    note: "Q1'26 어닝콜 최종 확정 유지: 빅4 합산 2026 capex $725B(YoY +77%) 전원 유지·상향 — MS $190B·구글 $175~190B(Q1 어닝콜서 2027 capex 'significantly higher' 예고)·아마존 $200B·메타 $125~145B; MS 데이터센터 임대 200MW 취소 보도(SemiAnalysis, 6월)는 자가건설→리스 전환 조정이며 capex 총액 감소 아님, 빅4 중 capex 감소·동결 가이드 0건(Tom's Hardware, SemiAnalysis, DataCenterDynamics, 2026-06)."
+    note: "Q1'26 최종 확인: 빅4 합산 2026 capex $725B(YoY +77%) 전원 유지·상향 — MS $190B·구글 최대 $190B(Q1서 $5B 추가 상향)·아마존 $200B·메타 $125~145B(기존 $115~135B 상향); Q2'26 어닝콜 7월 말 예정이나 capex 감소·동결 가이드 0건·AI 투자 '가속' 기조 유지(Tom's Hardware, Fortune, DataCenterDynamics, 2026-07)."
     next_check: 2026-07~08 (2분기 실적)
   - name: HBM4 양산 + 범용 D램 증설 (공급)
     why: 지금 수출 급증의 핵심은 '단가 폭등'. 공급(HBM4 양산·신규 팹)이 늘면 단가가 꺾인다.
     trigger: HBM4 대량양산 + 범용 D램 증설이 겹쳐 '공급과잉' 신호가 나올 때.
     where: 트렌드포스 등 업계 뉴스 · 3사 증설/capex 발표
     status: up
-    note: "SK하이닉스 HBM4 양산 속도 조절 결정(TrendForce 2026-06-23) — DDR5 마진 ~90%로 HBM과 유사해지자 HBM4 일부 라인을 DDR5로 전환, 삼성 HBM4 누적 매출 $1B 돌파로 공급 주도권 확보; HBM4 대량양산 지연 + 범용 D램도 DDR5 집중으로 이중 타이트 지속 — TrendForce 6/2 'HBM 계약가 2027년 수배 상승' 전망 및 공급과잉 신호 없음 재확인(TrendForce, TechTimes, 2026-06)."
+    note: "SK하이닉스 HBM4 속도 조절·DDR5 라인 전환으로 DDR5 계약가 Q1'26 +90~95%·Q2'26 +58~63% QoQ 추가 급등(TrendForce 2026-07) — 삼성·SK하이닉스 Q2 어닝콜서 '공급 부족 2027년까지 지속' 경고, 신규 팹(삼성 P5 2028년·SK하이닉스 M15X 2027년 중반) 가동 전 증설 제한적으로 HBM·범용 D램 이중 타이트 지속·공급과잉 신호 없음(TrendForce, DataCenterDynamics, TechTimes, 2026-06~07)."
     next_check: 분기별
   - name: 재고 — 고객 '쌓기→빼기' 전환
     why: 고객(데이터센터·세트업체)이 재고를 쌓다가 빼기 시작하면 주문이 급감 → 사이클 하강.
     trigger: 삼성·하이닉스 재고자산/재고일수(DIO) 반등, 또는 고객사 '재고 조정' 언급.
     where: 삼성·하이닉스 분기보고서(DART) · 어닝콜
     status: up
-    note: "SK하이닉스 D램·낸드 공급자 합산 재고 ~4주(이전 D램 단독 ~2주 대비 소폭 완화됐으나 역대 최저권 유지, Futunn 2026-06); 고객 OEM 버퍼재고 제로·'재고 쌓기→빼기' 전환 신호 없음 — PC·모바일 고객이 단가 급등 대응으로 탑재량 줄이는 '비용 절감'이며 재고 조정과 무관, 데이터센터 수요 여전히 왕성(IDC, VersaLogic, DataCenterDynamics, 2026-06)."
+    note: "SK하이닉스 D램 재고 ~2주·낸드 ~4~5주(역대 최저권), DDR5 일부 제품 '재고 제로' 상태 — 삼성·SK하이닉스 2026 HBM 전량 완판·Q2'26 합산 영업이익 ~96.9조원(사상 최대) 예상, PC·모바일 고객 가격 급등에 구매량 조정하나 재고 소진 아닌 비용 절감이며 '쌓기→빼기' 전환 신호 없음(DataCenterDynamics, CNBC, TrendForce, 2026-06~07)."
     next_check: 2026-07~08 (2분기 실적)
-# 출처(2026-06-28 조사): Tom's Hardware, SemiAnalysis, DataCenterDynamics, TrendForce, TechTimes,
-#   Futunn, IDC, VersaLogic —
-#   빅4 capex $725B 유지·MS 임대 200MW 취소 자가건설→리스 조정(총액 감소 없음) / SK하이닉스 HBM4 속도조절·DDR5 전환·삼성 HBM4 $1B / D램 공급자 재고 ~4주 역대 최저권·OEM 버퍼재고 제로.
+# 출처(2026-07-05 조사): Tom's Hardware, Fortune, DataCenterDynamics, TrendForce, TechTimes,
+#   CNBC, CryptoBriefing, OC3D —
+#   빅4 capex $725B 유지·메타 $125~145B 상향 / SK하이닉스 HBM4 속도조절·DDR5 전환·Q2 D램 계약가 +58~63% / 삼성·SK하이닉스 Q2 합산 영업이익 ~96.9조원 사상 최대·D램 재고 ~2주 역대 최저·공급부족 2027년 지속 경고.
