@@ -130,6 +130,33 @@ def data_export_decomp(df: pd.DataFrame, months: int = 24) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────
+# 2-c) 단가 전월比 (섹션 2 셋째 그래프) — 메모리·디램·낸드 $/kg 의 MoM %
+#      금액이 아니라 '가격의 속도'를 본다 — 사이클 천장에서 가장 먼저 꺾이는 값.
+# ─────────────────────────────────────────────────────────────
+def data_price_mom(df: pd.DataFrame, months: int = 13) -> dict:
+    pairs = [("메모리", "메모리수출_854232_백만$", "메모리수출_854232_톤", "#af52de"),
+             ("디램", "디램수출_백만$", "디램수출_톤", "#34c759"),
+             ("낸드", "낸드수출_백만$", "낸드수출_톤", "#ff9500")]
+    series, idx = [], None
+    for lab, vc, wc, color in pairs:
+        if vc not in df.columns or wc not in df.columns:
+            continue
+        v, w = df[vc].dropna(), df[wc].dropna()
+        common = v.index.intersection(w.index)
+        v, w = v[common], w[common]
+        price = ((v * 1e6) / (w * 1e3)).replace([np.inf, -np.inf], np.nan)
+        mom = (price.pct_change() * 100).iloc[-months:]
+        idx = mom.index if idx is None else idx.union(mom.index)
+        series.append({"label": lab, "color": color, "_mom": mom})
+    if idx is None:
+        return {"labels": [], "series": []}
+    idx = idx.sort_values()
+    return {"labels": _labels(idx),
+            "series": [{"label": s["label"], "color": s["color"],
+                        "data": _aligned(s["_mom"], idx, 1)} for s in series]}
+
+
+# ─────────────────────────────────────────────────────────────
 # 3) 분위별 1년 뒤 수익 (섹션 3) — 4개 지표 × (삼성·하이닉스) 막대
 # ─────────────────────────────────────────────────────────────
 def _q_series(bt: pd.DataFrame, tgt: str) -> list:

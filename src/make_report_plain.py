@@ -14,7 +14,8 @@ import yaml
 
 from analyze import load, build_signals, quintile_backtest, fwd_return, HORIZONS, TARGETS, HERE
 from chart_data import (data_cycle, data_quintile_grid, data_recent_exports,
-                        data_export_decomp, windowed, quintile_edges, REPORTS, CALIB_SINCE)
+                        data_export_decomp, data_price_mom, windowed, quintile_edges,
+                        REPORTS, CALIB_SINCE)
 
 SRC = os.path.dirname(os.path.abspath(__file__))
 
@@ -76,6 +77,15 @@ INIT_JS = r"""
         {label:'기준 100', data:dc.labels.map(function(){return 100;}), borderColor:'#c7c7cc', borderWidth:1, borderDash:[5,4], pointRadius:0}
       ]},
       options: baseOpts({ytitle:(dc.base+' = 100'), xmax:8})});
+  }
+  // 2-c) 단가 전월比(MoM) 막대 — 0선 위=전달보다 비싸짐 / 아래=싸짐
+  var pm = D.pricemom, elP = document.getElementById('cPriceMom');
+  if(pm && elP && pm.series.length){
+    new Chart(elP, {type:'bar',
+      data:{labels:pm.labels, datasets: pm.series.map(function(s){
+        return {label:s.label, data:s.data, backgroundColor:s.color, borderRadius:3, maxBarThickness:22};
+      })},
+      options: baseOpts({title:'평균단가($/kg) 전달 대비 변화율', ytitle:'전달比 %', xmax:13})});
   }
   // 3) 분위 막대 (지표별)
   (D.quint||[]).forEach(function(q, i){
@@ -442,6 +452,7 @@ def main() -> None:
         "quint": data_quintile_grid(df),         # 섹션3: 4개 지표 × 삼성·하이닉스 막대
         "exports": data_recent_exports(df),      # 섹션2: 20년 전체 수출 금액(가로 스크롤)
         "decomp": data_export_decomp(df),        # 섹션2: 메모리 수출 금액 vs 물량 vs 단가
+        "pricemom": data_price_mom(df),          # 섹션2: 단가 전월比(MoM) — 가격의 '속도'
     }
     n_q = len(chart_payload["quint"])
     ex_span = chart_payload["exports"].get("span", "")
@@ -469,6 +480,8 @@ def main() -> None:
             "vol_yoy": _yoy(w2).iloc[-1],        # 물량 작년比
             "price_yoy": _yoy(price).iloc[-1],   # 단가 작년比
             "price": price.iloc[-1],             # 현재 단가 $/kg
+            "price_mom": (price.iloc[-1] / price.iloc[-2] - 1) * 100,   # 단가 전달比
+            "price_mom_prev": (price.iloc[-2] / price.iloc[-3] - 1) * 100,
             "month": a.index[-1].strftime("%Y년 %m월"),
             "is_high": a.iloc[-1] >= a.max(),
             "mom": (a.iloc[-1] / a.iloc[-2] - 1) * 100,
@@ -738,6 +751,20 @@ def main() -> None:
       · 이 숫자는 <b>금액(달러)</b> 기준 — 몇 '개/톤' 팔렸나(물량)가 아니라 얼마치 팔았나입니다.<br>
       · 종류는 <b>메모리 전체(D램+낸드 합산, 관세청 코드 854232)</b> — <b>HBM만 따로는 못 가립니다.</b><br>
       · 즉 지금 금액 급증의 본질은 <b>'물량 폭발'이 아니라 '단가 폭등'</b> — 가격이 꺾이면 금액도 빠르게 식을 수 있습니다.</div>
+
+    <div class="step"><b>그래서 '전달 대비 단가'가 제일 중요합니다 — 가격의 속도계.</b><br>
+      금액 급증의 본질이 단가라면, 사이클이 꺾일 때 <b>가장 먼저 움직이는 것도 단가의 전달 대비 변화율</b>입니다.
+      작년比(YoY)는 1년 전과 비교라 천장을 지나고도 한참 높게 나오지만, 전달比(MoM)는 방향 전환을 몇 달 먼저 보여줍니다.</div>
+    <div class="chartbox"><canvas id="cPriceMom"></canvas></div>
+    <p class="big">{mem['month']} 단가 전달比 — <b style="color:#af52de">메모리 {mem['price_mom']:+.1f}%</b>
+    (전달 {mem['price_mom_prev']:+.1f}%) ·
+    <b style="color:#34c759">디램 {dram['price_mom']:+.1f}%</b> ·
+    <b style="color:#ff9500">낸드 {nand['price_mom']:+.1f}%</b>.
+    {'<b>디램 단가가 전달보다 내렸습니다</b> — 상승이 멈췄는지 다음 달 수치로 확인이 필요합니다.' if dram['price_mom'] < 0 else '아직 세 품목 모두 전달보다 오르는 중입니다.'}</p>
+    <div class="warn"><b>이 그래프 읽는 법.</b><br>
+      · 막대가 <b>0선 위</b>=전달보다 비싸게 팔았다, <b>0선 아래</b>=싸게 팔았다.<br>
+      · 천장 신호는 '마이너스 한 달'이 아니라 <b>막대가 몇 달 연속 낮아지다 0 아래로 내려가는 흐름</b>입니다.<br>
+      · 이 단가는 수출액÷중량의 <b>평균단가</b>라 제품 구성(HBM 비중 등)이 바뀌어도 출렁일 수 있습니다 — 한 달 수치 과신 금지.</div>
 
     {flows_block}
 
