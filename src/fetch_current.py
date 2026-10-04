@@ -26,6 +26,8 @@ def main() -> None:
         print(f"  ⚠ 수출 데이터 건너뜀(키 없음/오류): {e}\n    → 기존 exports CSV를 그대로 사용합니다.")
     except Exception as e:  # 네트워크/파싱 오류도 비치명적으로 처리
         print(f"  ⚠ 수출 데이터 갱신 실패: {e}\n    → 기존 exports CSV를 그대로 사용합니다.")
+        # Actions 실행 요약에 노란 경고로 띄움 → '성공'으로만 보여서 실패를 놓치는 일 방지
+        print(f"::warning::관세청 수출 데이터 갱신 실패 — 기존 CSV 사용: {e}")
 
     print("\n[3/3] 투자자 수급(외국인·기관 순매수) 갱신 (KRX) …")
     try:
