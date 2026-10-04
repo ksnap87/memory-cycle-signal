@@ -14,6 +14,7 @@ import sys
 import argparse
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
+import time
 import requests
 import pandas as pd
 
@@ -22,6 +23,11 @@ RAW = os.path.join(HERE, "data", "raw")
 os.makedirs(RAW, exist_ok=True)
 
 ENDPOINT = "https://apis.data.go.kr/1220000/nitemtrade/getNitemtradeList"
+# data.go.kr 은 해외(GitHub Actions 러너) 접속이 간헐적으로 타임아웃 난다(2026-08·09 월간 실행 실패).
+# → 같은 요청을 백오프 재시도하고, https 연결이 안 되면 공식 문서상 주소인 http 로도 시도한다.
+ENDPOINT_FALLBACK = ENDPOINT.replace("https://", "http://", 1)
+RETRY_WAITS = (5, 15, 45)          # 실패 시 대기(초) — 최대 4회 시도
+TIMEOUT = (20, 60)                 # (연결, 응답) 초
 HS_SEMICONDUCTOR = "8542"   # 전자집적회로(반도체 핵심). 메모리만 보려면 854232
 START_YYMM = "200601"
 
@@ -51,7 +57,21 @@ def call(key: str, strt: str, end: str, hs: str = HS_SEMICONDUCTOR) -> requests.
         "endYymm": end,
         "hsSgn": hs,
     }
-    return requests.get(ENDPOINT, params=params, timeout=30)
+    last_err: Exception | None = None
+    for attempt in range(len(RETRY_WAITS) + 1):
+        for url in (ENDPOINT, ENDPOINT_FALLBACK):
+            try:
+                r = requests.get(url, params=params, timeout=TIMEOUT)
+                if r.status_code < 500:      # 4xx 는 키/권한 문제 → 재시도해도 같으므로 바로 반환
+                    return r
+                last_err = RuntimeError(f"HTTP {r.status_code}")
+            except requests.RequestException as e:
+                last_err = e
+        if attempt < len(RETRY_WAITS):
+            wait = RETRY_WAITS[attempt]
+            print(f"  … 관세청 접속 실패({type(last_err).__name__}) — {wait}초 후 재시도 ({attempt + 1}/{len(RETRY_WAITS)})")
+            time.sleep(wait)
+    raise RuntimeError(f"관세청 API 접속 실패(재시도 {len(RETRY_WAITS)}회 소진): {last_err}")
 
 
 def probe(key: str, yymm: str) -> None:
@@ -99,20 +119,30 @@ def sum_months(xml_text: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", metavar="YYYYMM", help="한 달치 원본 응답 확인")
-    args = ap.parse_args()
+    ap.add_argument("--full", action="store_true", help="2006년부터 전체 재수집(기본: 최근 2년만 받아 기존 CSV에 덮어쓰기)")
+    args, _ = ap.parse_known_args()
 
     key = load_key()
     if args.probe:
         probe(key, args.probe)
         return
 
-    # 전체기간 수집 — HS코드별 × 연도별로 끊어 호출(응답 과대·캡 방지).
-    # HS 4종 × 20여 연도 ≈ 80여 콜 << 일 10,000.
+    out_path = os.path.join(RAW, "exports_semiconductor.csv")
+    old = None
+    if not args.full and os.path.exists(out_path):
+        old = pd.read_csv(out_path, index_col=0, parse_dates=True, encoding="utf-8-sig")
+        if old.empty:
+            old = None
+
+    # HS코드별 × 연도별로 끊어 호출(응답 과대·캡 방지).
+    # 기본은 '증분' — 작년·올해만 받아 기존 CSV의 같은 달을 덮어쓴다(관세청 잠정→확정치 수정 반영).
+    # HS 4종 × 2년 = 8콜이라 접속 불안정에 덜 노출된다. CSV가 없거나 --full 이면 2006년부터 전체.
     end = pd.Timestamp.today()
+    start_year = end.year - 1 if old is not None else int(START_YYMM[:4])
     rows: dict = {}
     for val_f, wgt_f, hs in HS_TARGETS:
         got = set()
-        for yr in range(int(START_YYMM[:4]), end.year + 1):
+        for yr in range(start_year, end.year + 1):
             strt = f"{yr}01"
             last = f"{yr}{end.month:02d}" if yr == end.year else f"{yr}12"
             r = call(key, strt, last, hs)
@@ -145,7 +175,12 @@ def main() -> None:
     df = df[["반도체수출_8542_백만$", "메모리수출_854232_백만$", "디램수출_백만$", "낸드수출_백만$",
              "반도체수출_8542_톤", "메모리수출_854232_톤", "디램수출_톤", "낸드수출_톤"]]
 
-    out_path = os.path.join(RAW, "exports_semiconductor.csv")
+    if old is not None:
+        prev_last = old.index.max()
+        df = pd.concat([old[~old.index.isin(df.index)], df]).sort_index()[old.columns]
+        new_months = [d.strftime("%Y-%m") for d in df.index if d > prev_last]
+        print(f"  기존 마지막 달 {prev_last:%Y-%m} → 새로 추가: {', '.join(new_months) or '없음(아직 미발표)'}")
+
     df.to_csv(out_path, encoding="utf-8-sig")
     print(f"\n저장: {out_path}")
     print(f"기간: {df.index.min().date()} ~ {df.index.max().date()}  ({len(df)}개월)")
