@@ -3,7 +3,7 @@
 # 아래 3개는 어닝콜·업계뉴스·분기보고서 기반 → '예약된 작업(Claude)'이 매주 웹에서 자동 조사·갱신한다.
 #   (수동으로 고칠 때는 updated 날짜와 각 status/note 만 바꾸면 됨.)
 # status: up = 🟢 아직 안전 / flat = 🟡 주의(첫 징후) / down = 🔴 경고(전환)
-updated: 2026-10-18
+updated: 2026-10-25
 auto: 매주 웹 조사(예약작업)로 갱신
 items:
   - name: 하이퍼스케일러 투자(capex) 가이던스
@@ -11,25 +11,25 @@ items:
     trigger: 빅4 중 다수가 다음 분기 capex를 '동결·축소'로 가이드하거나 "AI 투자 속도조절" 발언.
     where: 각사 분기 실적발표(어닝콜)
     status: up
-    note: "Q2 어닝콜 기준 빅4 합산 capex $7,200~7,450억—메타 $1,250~1,450억·알파벳 $1,950~2,050억·아마존 $2,000~2,200억·MS ~$1,900억; 메타·알파벳 가이던스 상향, 감축·동결 가이드 0건 유지; 빅4 Q3 실적(MS·알파벳·메타 10/28~30, 아마존 10/31 예정)으로 추가 확인 대기(MMARW·yieldtheory.app·tech-insider.org, 2026-10-18 기준)."
-    next_check: 2026-10 말 (Q3 실적 발표 후)
+    note: "Meta Q3 결과(10/21 발표): 연간 capex 가이던스 $135~145B(하한 $130B→$135B 상향)·Q3 capex $34.9B; FCF 마이너스·주가 -7%이나 capex 자체는 유지·상향; Google·MS·Amazon Q3 발표(10/28) 대기 중; 빅4 합산 연간 $720~745B 범위 유지, 감축·동결 0건(CNBC·Fortune, 2026-10-21 기준)."
+    next_check: 2026-10 말 (Google·MS·Amazon Q3 실적 발표 후)
   - name: HBM4 양산 + 범용 D램 증설 (공급)
     why: 지금 수출 급증의 핵심은 '단가 폭등'. 공급(HBM4 양산·신규 팹)이 늘면 단가가 꺾인다.
     trigger: HBM4 대량양산 + 범용 D램 증설이 겹쳐 '공급과잉' 신호가 나올 때.
     where: 트렌드포스 등 업계 뉴스 · 3사 증설/capex 발표
     status: up
-    note: "TrendForce(2026-08): D램 공급 2027년까지 빡빡 지속 전망·HBM4 3사 양산 진행 중 물량 전량 완판; 범용 D램 계약가격 2026년 Q1 QoQ +90~95% 급등(TrendForce), Micron '재고 수준 및 공급 매우 빡빡(extremely tight)' 발언·HBM4 고용량 납품 개시—공급과잉 징후 없음(TrendForce·tech-insider.org·CNBC, 2026-10-18 기준)."
+    note: "TrendForce(2026-08): D램 공급 2027년까지 빡빡 지속; 2026년 HBM4 전량 매진(고객 주문의 60~70%만 공급); Q3 서버 D램 계약가 +13~18% QoQ·Q4 +10~15% 추가 상승 전망—공급과잉 징후 없음; Micron '2026년 HBM4 생산 전량 완판' 발언(TrendForce·tech-insider.org·CNBC, 2026-10-25 기준)."
     next_check: 분기별
   - name: 재고 — 고객 '쌓기→빼기' 전환
     why: 고객(데이터센터·세트업체)이 재고를 쌓다가 빼기 시작하면 주문이 급감 → 사이클 하강.
     trigger: 삼성·하이닉스 재고자산/재고일수(DIO) 반등, 또는 고객사 '재고 조정' 언급.
     where: 삼성·하이닉스 분기보고서(DART) · 어닝콜
     status: up
-    note: "SK하이닉스 Q3 실적(10/28)·삼성 Q3(10/29) 발표 대기 중; 발표 전 Micron Q3 어닝콜 '재고 수준 및 공급 매우 빡빡' 발언, Q3 서버 D램 가격 +13~18% QoQ 상승 전망—고객사 '재고 조정' 언급 0건, D램 재고 10일 미만 지속 추정(Micron 어닝콜·KB Securities·sedaily.com, 2026-10-18 기준)."
-    next_check: 2026-10 말 (삼성·SK하이닉스 Q3 실적 발표 후)
-# 출처(2026-10-18 조사): MMARW, yieldtheory.app, tech-insider.org,
-#   Yahoo Finance(2026-10), TrendForce(2026-08), CNBC(2026-07-29),
-#   KB Securities, sedaily.com(2026-09-25), 247wallst.com(2026-10-06) —
-#   빅4 Q2 capex 합산 $7,200~7,450억, 메타·알파벳 상향, 감축·동결 0건; Q3 실적 10월 말 발표 대기 /
-#   범용 D램 계약가 Q1 QoQ +90~95%, HBM4 양산 물량 매진, 2027년까지 공급 타이트, 공급과잉 없음 /
-#   삼성·SK하이닉스 Q3 실적(10/28~29) 대기; Micron '재고 매우 빡빡', 고객 재고조정 0건.
+    note: "삼성·SK하이닉스 Q3 실적 10/28~29 발표 대기; Samsung 예상 영업이익 107.4조원(매출 195조원)·메모리 마진 ~76% 유지, SK하이닉스 컨센서스 영업이익 74~77조원; Micron '공급 매우 빡빡(extremely tight)' 유지—고객 재고조정 신호 0건(Korea Times·investing.com·Micron 어닝콜, 2026-10-25 기준)."
+    next_check: 2026-10 말 (삼성·SK하이닉스 Q3 실적 발표 후 DIO 확인)
+# 출처(2026-10-25 조사): CNBC(2026-10-21), Fortune(2026-10-21), Korea Times(2026-10-26),
+#   TrendForce(2026-08), tech-insider.org, investing.com(2026-10-25),
+#   sedaily.com, 247wallst.com —
+#   Meta Q3 capex 가이던스 $135~145B(하한 $130B→$135B 상향)·Q3 capex $34.9B·FCF 마이너스; Google·MS·Amazon 10/28 발표 대기 /
+#   D램 공급 2027년까지 타이트, HBM4 전량 매진(주문의 60~70%만 공급), Q3 서버D램 +13~18% QoQ /
+#   삼성·SK하이닉스 Q3 결과 10/28~29 대기; Samsung 예상이익 107.4조원, 마진 76%; 고객 재고조정 신호 0건.
