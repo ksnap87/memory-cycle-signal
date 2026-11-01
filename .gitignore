@@ -11,6 +11,7 @@ reports/
 data/raw/*
 !data/raw/exports_semiconductor.csv
 !data/raw/flows_investor.csv
+!data/raw/prices_daily.csv
 
 # 대시보드 원자료(JSON)는 게시하지 않음 — 암호화된 index.html 만 공개
 docs/signals.json
