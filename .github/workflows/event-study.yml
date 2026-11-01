@@ -1,0 +1,50 @@
+name: release-event-study
+
+# '단가 발표일 기준 주가 반응' 분석 — 일별 주가를 받아 계산하고 결과 CSV를 같은 브랜치에 커밋.
+# 분석 스크립트·이 워크플로가 바뀌어 푸시될 때, 또는 수동 실행 버튼으로 돈다.
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - src/fetch_prices_daily.py
+      - src/release_event_study.py
+      - .github/workflows/event-study.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: event-study-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 패키지 설치
+        run: pip install -r requirements-ci.txt
+
+      - name: 일별 주가 수집 + 발표일 기준 분석
+        run: |
+          python3 src/fetch_prices_daily.py
+          python3 src/release_event_study.py | tee event_study.log
+
+      - name: 결과 커밋 & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/raw/prices_daily.csv data/processed/release_event_study.csv
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "발표일 기준 이벤트 분석 결과: $(date -u +%Y-%m-%d)"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
