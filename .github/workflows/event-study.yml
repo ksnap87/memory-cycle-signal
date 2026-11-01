@@ -10,6 +10,7 @@ on:
       - src/fetch_prices_daily.py
       - src/release_event_study.py
       - .github/workflows/event-study.yml
+      - .gitignore   # 결과 CSV 커밋 가능 여부가 여기에 달려 있음
   workflow_dispatch: {}
 
 permissions:
