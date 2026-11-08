@@ -3,33 +3,35 @@
 # 아래 3개는 어닝콜·업계뉴스·분기보고서 기반 → '예약된 작업(Claude)'이 매주 웹에서 자동 조사·갱신한다.
 #   (수동으로 고칠 때는 updated 날짜와 각 status/note 만 바꾸면 됨.)
 # status: up = 🟢 아직 안전 / flat = 🟡 주의(첫 징후) / down = 🔴 경고(전환)
-updated: 2026-11-01
+updated: 2026-11-08
 auto: 매주 웹 조사(예약작업)로 갱신
 items:
   - name: 하이퍼스케일러 투자(capex) 가이던스
     why: AI 데이터센터 투자(MS·구글·아마존·메타)가 HBM·D램 수요의 근원. 이게 꺾이면 수요가 식는다.
     trigger: 빅4 중 다수가 다음 분기 capex를 '동결·축소'로 가이드하거나 "AI 투자 속도조절" 발언.
     where: 각사 분기 실적발표(어닝콜)
-    status: flat
-    note: "MS Q3(10/28): 연간 capex $175B→$170B 하향·Q3 실제 $45.2B로 컨센서스 $50.7B 미달; Alphabet Q3(10/28): 가이던스 $195~205B 유지이나 실제 지출이 추정치 미달; Amazon Q3(10/29): $220B 유지·Q3 $75.9B; Meta: 가이던스 $135~145B(하한 상향 유지)—MS·Google 동시 지출 부진이 '속도조절' 첫 신호(QZ, CNBC, 404k Research, 2026-10-29 기준)."
+    status: up
+    note: "Alphabet Q3: 연간 capex 가이던스 $180~190B→$195~205B 상향, 2027년 '상당히 높은' 지출 추가 시그널; Amazon $220B 유지·9개월 누적 $175.7B 집행; Meta $130~145B(하한 상향); MS $170B 소폭 하향—빅4 중 3사 가이던스 유지·상향으로 이전 '속도조절' 신호 소멸, AI 데이터센터 투자 급증세 지속(introl.com·yieldtheory.app·useluminix.com, 2026-11-08 기준)."
     next_check: 2026-12 (빅4 Q4 실적 및 2027 초기 가이던스)
   - name: HBM4 양산 + 범용 D램 증설 (공급)
     why: 지금 수출 급증의 핵심은 '단가 폭등'. 공급(HBM4 양산·신규 팹)이 늘면 단가가 꺾인다.
     trigger: HBM4 대량양산 + 범용 D램 증설이 겹쳐 '공급과잉' 신호가 나올 때.
     where: 트렌드포스 등 업계 뉴스 · 3사 증설/capex 발표
     status: up
-    note: "TrendForce(2026-08): D램 공급 2027년까지 타이트 지속·2027 HBM 비트 출하 +50~60% YoY도 수요에 부족; Samsung·SK하이닉스 완제품 D램 재고 10일 미만(역대 최저)·D램 sufficiency ratio -1~-2%(공급부족); Q4 2026 서버D램 계약가 +0~5% QoQ 예상—공급과잉 신호 없음(TrendForce·tech-insider.org·useluminix, 2026-11-01 기준)."
+    note: "TrendForce: HBM4 양산 2Q26 착수·2026년 D램 sufficiency ratio -1~-2%(공급부족 지속); HBM wafer share 2026年末 22%→2027年末 30%로 확대, 범용 D램 가격 2025년 4Q부터 급등세 유지; SK하이닉스 '2029년까지 사실상 완판'—공급과잉 신호 없음(TrendForce·markets.financialcontent.com·useluminix.com, 2026-11-08 기준)."
     next_check: 분기별
   - name: 재고 — 고객 '쌓기→빼기' 전환
     why: 고객(데이터센터·세트업체)이 재고를 쌓다가 빼기 시작하면 주문이 급감 → 사이클 하강.
     trigger: 삼성·하이닉스 재고자산/재고일수(DIO) 반등, 또는 고객사 '재고 조정' 언급.
     where: 삼성·하이닉스 분기보고서(DART) · 어닝콜
     status: up
-    note: "SK하이닉스 Q3(10/29): 분기 영업이익 83.3조원(YoY +632%)·매출 104.6조원(사상 첫 100조원 돌파)·CEO '수요가 2030년까지 공급 초과' 언급; Samsung Q3도 사상 최대 수준 확인; D램 재고 10일 미만—고객 재고조정 신호 0건(investing.com·The Next Web·UPI, 2026-10-29 기준)."
+    note: "SK하이닉스 Q3 OPM 80% 사상 최고·14개 주요 고객 LTA로 2027~28년 캐파 50%+ 사전 확보, '2029년까지 D램·HBM 사실상 완판'; SKHY 재고회전율 4.8x(3년 최고); Samsung Q3 D램 ASP +20%·글로벌 점유율 38%—재고조정·디스토킹 신호 0건(TrendForce·Seeking Alpha·Counterpoint Research, 2026-11-08 기준)."
     next_check: 2026-12 (삼성·SK하이닉스 Q4 실적 발표 시 DIO 확인)
-# 출처(2026-11-01 조사): QZ.com(2026-10-29), CNBC(2026-10-29), 404k Research Substack(2026-10-29),
-#   TrendForce(2026-08), tech-insider.org, useluminix.com(DRAM Cycle Oct 2026),
-#   investing.com(2026-10-29), The Next Web(2026-10-29), UPI(2026-10-29) —
-#   MS capex $175B→$170B 하향·Q3 $45.2B(추정치 미달); Google·MS 동시 지출 부진 '속도조절' 첫 신호 /
-#   D램 재고 10일 미만, sufficiency ratio -1~-2%, Q4 계약가 +0~5% QoQ, 공급과잉 0 /
-#   SK하이닉스 Q3 영업이익 83.3조원(+632% YoY)·매출 104.6조원 사상 최대; 재고조정 신호 0건.
+# 출처(2026-11-08 조사): introl.com, datacentres.com, yieldtheory.app, useluminix.com(Hyperscaler Capex Q3 2026),
+#   TrendForce(2026-01~02 HBM4 press releases), markets.financialcontent.com(2025-12-26),
+#   useluminix.com(DRAM Cycle Oct 2026), investing.com(SK Hynix Q3 Transcript),
+#   finance.yahoo.com(SK Hynix Q3), TrendForce(SK Hynix 3Q26 OPM), seekingalpha.com(SKHY Q3),
+#   sammyfans.com(Counterpoint Research 2026-11-05) —
+#   Alphabet capex 가이던스 $195~205B 상향+2027 추가 증가 시그널; Amazon $220B·Meta 하한 상향 → 빅4 3사 유지·상향 /
+#   HBM4 2Q26 양산·D램 sufficiency -1~-2%·wafer share 2027末 30%·공급과잉 0 /
+#   SK하이닉스 OPM 80% 최고·재고회전 4.8x·2029년 사실상 완판; Samsung D램 ASP +20%·재고조정 신호 0건.
