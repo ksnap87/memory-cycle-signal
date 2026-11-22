@@ -3,7 +3,7 @@
 # 아래 3개는 어닝콜·업계뉴스·분기보고서 기반 → '예약된 작업(Claude)'이 매주 웹에서 자동 조사·갱신한다.
 #   (수동으로 고칠 때는 updated 날짜와 각 status/note 만 바꾸면 됨.)
 # status: up = 🟢 아직 안전 / flat = 🟡 주의(첫 징후) / down = 🔴 경고(전환)
-updated: 2026-11-15
+updated: 2026-11-22
 auto: 매주 웹 조사(예약작업)로 갱신
 items:
   - name: 하이퍼스케일러 투자(capex) 가이던스
@@ -11,26 +11,26 @@ items:
     trigger: 빅4 중 다수가 다음 분기 capex를 '동결·축소'로 가이드하거나 "AI 투자 속도조절" 발언.
     where: 각사 분기 실적발표(어닝콜)
     status: up
-    note: "빅4 Q3 2026 가이던스: Alphabet $195~205B 유지·2027년 '상당히 높은' 지출 추가 시그널; Amazon $220B 유지·2027년 meaningfully higher 예고; Meta $135~145B(하한 $130→$135 상향); MS ~$170B 대체로 유지—4사 모두 capex 유지·상향, '속도조절' 발언 없음, AI 데이터센터 투자 급증세 지속(yieldtheory.app·useluminix.com·ajussiguide.com, 2026-11-15 기준)."
+    note: "빅4 Q3 2026 어닝콜(2026-10-28~29): MS Q3 분기 capex $45.2B·Q4 $50B+ 가이던스(연간 ~$170B); Alphabet $195~205B·2027 'significantly higher'; Amazon $220B·2027 'meaningfully higher'; Meta $135~145B(하한 $130→$135 상향)—합산 $720~740B, 전년 대비 +78%; 속도조절 발언·capex 축소 신호 없음(fortune.com·yieldtheory.app·thealphaagentic.com, 2026-11-22 기준)."
     next_check: 2026-12 (빅4 Q4 실적 및 2027 초기 가이던스)
   - name: HBM4 양산 + 범용 D램 증설 (공급)
     why: 지금 수출 급증의 핵심은 '단가 폭등'. 공급(HBM4 양산·신규 팹)이 늘면 단가가 꺾인다.
     trigger: HBM4 대량양산 + 범용 D램 증설이 겹쳐 '공급과잉' 신호가 나올 때.
     where: 트렌드포스 등 업계 뉴스 · 3사 증설/capex 발표
     status: up
-    note: "TrendForce(2026-11-04): HBM4 양산·물량 완판·내년분 가격 협의 완료; HBM4가 범용 D램 웨이퍼 3배 소비→범용 공급도 타이트, 2027년까지 공급 부족 지속 전망; IDC '공급-수요 갭 2027년 중반까지 지속'; 공급과잉 신호 없음(TrendForce·techtimes.com·shattered.io, 2026-11-15 기준)."
+    note: "TrendForce(2026-11-18): 범용 D램 ASP Q4 2026 QoQ +10~15% 상승 전망, HBM4 내년분 완판·계약 완료; HBM 웨이퍼 비중 2026년 23%→2027년 ~30%로 확대; 공급과잉 위험은 2028년 집중 증설 시점까지 없음—공급과잉 신호 0건(trendforce.com·shattered.io·longbridge.com, 2026-11-22 기준)."
     next_check: 분기별
   - name: 재고 — 고객 '쌓기→빼기' 전환
     why: 고객(데이터센터·세트업체)이 재고를 쌓다가 빼기 시작하면 주문이 급감 → 사이클 하강.
     trigger: 삼성·하이닉스 재고자산/재고일수(DIO) 반등, 또는 고객사 '재고 조정' 언급.
     where: 삼성·하이닉스 분기보고서(DART) · 어닝콜
-    status: up
-    note: "삼성·SK하이닉스 D램 완제품 재고 10일 미만(KB Securities 2026-09-07 추산); SK하이닉스 '2029년까지 D램·HBM 사실상 완판'(2026-10-28 어닝콜), Samsung '2027년 HBM 완판·목표 단가 협의 완료'(2026-10-29)—디스토킹·재고 반등 신호 0건(trendforce.com·vlsi.kr·buysellram.com, 2026-11-15 기준)."
+    status: flat
+    note: "소비자가전 고객이 D램 가격 급등에 따른 구매량 조정 시작(삼성 어닝콜, datacenterdynamics.com); HBM 채널 재고주수 5.2→5.8주로 상승(sgincomestock.com 2026-11월); TrendForce(2026-11-18) 채널 디스토킹으로 현물-계약 가격 갭 확대—AI 데이터센터 수요는 여전히 타이트하나 소비자가전·채널 재고 조정 첫 징후 출현."
     next_check: 2026-12 (삼성·SK하이닉스 Q4 실적 발표 시 DIO 확인)
-# 출처(2026-11-15 조사): yieldtheory.app, useluminix.com, ajussiguide.com(Hyperscaler Capex Q3 2026),
-#   TrendForce(2026-11-04 DRAM Market Bulletin), techtimes.com(2026-09-07 HBM4·재고),
-#   shattered.io(DRAM Supply 2026), vlsi.kr(Daily Silicon 2026-11-01),
-#   buysellram.com(Samsung·SK hynix Q3 2026 Results), trendforce.com(2026-08-04) —
-#   빅4 capex $720~745B 대체로 유지·상향, 속도조절 발언 없음 /
-#   HBM4 양산 완판·범용 D램 2027년까지 공급 타이트·공급과잉 신호 0 /
-#   삼성·SK하이닉스 D램 재고 10일 미만; 2027~2029년 사실상 완판; 디스토킹 신호 0건.
+# 출처(2026-11-22 조사): fortune.com·yieldtheory.app·thealphaagentic.com(Hyperscaler Capex Q3 2026),
+#   TrendForce(2026-11-18 DRAM Market Bulletin), shattered.io(HBM 웨이퍼 비중),
+#   longbridge.com(TrendForce HBM4 가격 전망), datacenterdynamics.com(삼성·SK하이닉스 Q3 2026),
+#   sgincomestock.com(HBM 채널 재고주수 상승) —
+#   빅4 capex $720~740B 유지·상향, 속도조절 발언 없음 /
+#   범용 D램 ASP Q4 +10~15% QoQ; HBM4 내년분 완판; 공급과잉 2028년 이후 /
+#   소비자가전 구매 조정·HBM 채널 재고주수 5.8주(↑)·채널 디스토킹 첫 징후.
